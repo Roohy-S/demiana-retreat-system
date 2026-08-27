@@ -32,6 +32,9 @@ htmlcov/
 .nox/
 .hypothesis/
 
+# Binary tools
+*.exe
+
 # Local databases, SQLite WAL files, & storage uploads
 *.db
 *.db-shm
