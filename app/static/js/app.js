@@ -244,7 +244,7 @@ function updatePasswordStrength(password, barFillId, textLabelId) {
 // ==============================================================================
 let otpTimerInterval = null;
 
-function openEmailVerificationModal(email) {
+function openEmailVerificationModal(email, devOtp = null) {
   AppState.pendingVerificationEmail = email;
   let modal = document.getElementById('email-otp-modal');
   if (!modal) {
@@ -254,19 +254,30 @@ function openEmailVerificationModal(email) {
     document.body.appendChild(modal);
   }
 
+  const devOtpBanner = devOtp ? `
+    <div style="background:rgba(212, 175, 55, 0.16); border:1.5px dashed var(--primary-gold); padding:12px 16px; border-radius:12px; margin-bottom:18px; text-align:center;">
+      <div style="font-size:0.84rem; color:var(--text-gold); margin-bottom:4px;">🔑 رمز التحقق المباشر (للتجربة السريعة):</div>
+      <div style="font-size:1.6rem; font-weight:900; color:#FFFFFF; letter-spacing:8px; font-family:monospace;">${devOtp}</div>
+      <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">(تم وضعه تلقائياً في الخانة أدناه لسهولة التجربة)</div>
+    </div>
+  ` : '';
+
   modal.innerHTML = `
     <div class="modal-card glass-card animate-scale-in" style="max-width:500px; text-align:center;">
       <div style="font-size:2.8rem; color:var(--primary-gold); margin-bottom:12px;">📧</div>
       <h3 style="color:var(--primary-gold); margin-bottom:8px;">تأكيد وتفعيل الحساب (Email OTP)</h3>
-      <p style="font-size:0.92rem; color:var(--text-secondary); line-height:1.6; margin-bottom:20px;">
+      <p style="font-size:0.92rem; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;">
         تم إرسال رمز تحقق مكون من 6 أرقام إلى بريدكِ الإلكتروني:<br>
         <strong style="color:var(--primary-gold); direction:ltr; display:inline-block; font-size:1.05rem; margin-top:4px;">${email}</strong>
       </p>
+
+      ${devOtpBanner}
 
       <div class="form-group" style="margin-bottom:20px;">
         <label style="font-weight:700; margin-bottom:8px; display:block; color:var(--text-primary);">أدخلي رمز التحقق (6 أرقام):</label>
         <input type="text" id="otp-input" maxlength="6" class="form-control" 
                placeholder="123456" 
+               value="${devOtp || ''}"
                style="text-align:center; font-size:2rem; letter-spacing:10px; font-weight:bold; font-family:monospace; padding:12px; border-color:var(--primary-gold);"
                autocomplete="one-time-code" autofocus />
       </div>
@@ -498,6 +509,11 @@ async function handleForgotRequestSubmit(event) {
     document.getElementById('forgot-step-1').style.display = 'none';
     document.getElementById('forgot-step-2').style.display = 'block';
     document.getElementById('reset-target-email').innerText = resetPasswordEmail;
+    if (res.dev_otp) {
+      const otpInput = document.getElementById('reset-otp');
+      if (otpInput) otpInput.value = res.dev_otp;
+      showToast(`💡 رمز الاستعادة المباشر: ${res.dev_otp}`, 'info');
+    }
   } catch (err) {
     showToast(err.message || 'فشل إرسال رمز الاستعادة', 'danger');
   } finally {

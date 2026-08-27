@@ -759,7 +759,7 @@ async function submitWizardRegistration() {
     if (regRes.requires_verification) {
       // Prompt Email OTP Modal
       showToast(regRes.message, 'success');
-      openEmailVerificationModal(regRes.email);
+      openEmailVerificationModal(regRes.email, regRes.dev_otp);
       return;
     }
 

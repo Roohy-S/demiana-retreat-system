@@ -277,12 +277,15 @@ async def register_applicant(payload: UserRegister, db: AsyncSession = Depends(g
         # Dispatch real email
         await send_verification_email(user.email, payload.full_name, otp)
 
-        return {
+        resp_data = {
             "message": "تم إنشاء الحساب بنجاح. تم إرسال رمز التحقق (OTP) إلى بريدكِ الإلكتروني لتأكيد التسجيل.",
             "requires_verification": True,
             "email": user.email,
             "user_id": user.id
         }
+        if not settings.SMTP_USER:
+            resp_data["dev_otp"] = otp
+        return resp_data
 
     # If verification not strictly required, commit & return access token immediately
     await db.commit()
@@ -418,10 +421,13 @@ async def resend_verification_code(payload: ResendOTPRequest, db: AsyncSession =
 
     await send_verification_email(user.email, name, otp)
 
-    return {
+    resp_data = {
         "message": "تم إرسال رمز تحقق جديد إلى بريدكِ الإلكتروني بنجاح.",
         "email": user.email
     }
+    if not settings.SMTP_USER:
+        resp_data["dev_otp"] = otp
+    return resp_data
 
 @router.post("/forgot-password")
 async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
@@ -456,10 +462,13 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Dep
     email_parts = user.email.split("@")
     masked_email = email_parts[0][0] + "***" + (email_parts[0][-1] if len(email_parts[0]) > 1 else "") + "@" + email_parts[1]
 
-    return {
+    resp_data = {
         "message": f"تم إرسال رمز إعادة تعيين كلمة المرور إلى البريد المسجل ({masked_email}) بنجاح.",
         "email": user.email
     }
+    if not settings.SMTP_USER:
+        resp_data["dev_otp"] = otp
+    return resp_data
 
 @router.post("/reset-password")
 async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
