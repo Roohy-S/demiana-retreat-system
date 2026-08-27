@@ -1,0 +1,1364 @@
+/**
+ * Mother Superior & Supervisors Command Center View
+ */
+
+let adminState = {
+  currentTab: 'overview',
+  stats: null,
+  periods: [],
+  selectedCandidate: null,
+  activeFilterPeriodId: '',
+  activeFilterStatus: '',
+  searchQuery: '',
+  privacyMode: true
+};
+
+async function renderAdminDashboard(container) {
+  container.innerHTML = `
+    <div class="container" style="padding-top:20px; padding-bottom:80px;">
+      <!-- Admin Top Banner & Controls -->
+      <div class="section-header" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 style="color:var(--primary-gold); font-size:1.6rem; display:flex; align-items:center; gap:10px;">
+            <span>✝</span> لوحة تحكم الأم المسؤولة عن بيت الخلوة
+          </h1>
+          <p class="text-muted" style="font-size:0.85rem;">دير القديسة دميانة العامر ببراري بلقاس</p>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:12px;">
+          <!-- Privacy Mode Toggle -->
+          <button class="btn btn-sm ${adminState.privacyMode ? 'btn-outline-gold' : 'btn-secondary'}" onclick="togglePrivacyMode()">
+            <span>${adminState.privacyMode ? '🔒 وضع الخصوصية مفعّل' : '🔓 وضع الخصوصية معطل'}</span>
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="openCreatePeriodModal()">
+            <span>+</span> إنشاء فترة خلوة جديدة
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="tabs-nav" id="admin-main-tabs">
+        <button class="tab-btn active" onclick="switchAdminTab('overview')">📊 نظرة عامة والأولويات</button>
+        <button class="tab-btn" onclick="switchAdminTab('periods')">📅 إدارة الفترات والسعة</button>
+        <button class="tab-btn" onclick="switchAdminTab('bookings')">📑 إدارة الحجوزات والطلبات</button>
+        <button class="tab-btn" onclick="switchAdminTab('gate')">🚪 البوابة والاستقبال (Check-in)</button>
+        <button class="tab-btn" onclick="switchAdminTab('reports')">📈 التقارير و PDF</button>
+        <button class="tab-btn" onclick="switchAdminTab('duplicates')">🛡️ تدقيق ومنع التكرار</button>
+        <button class="tab-btn" onclick="switchAdminTab('staff')">👥 المشرفون والصلاحيات</button>
+        <button class="tab-btn" onclick="switchAdminTab('settings')">⚙️ إعدادات النظام والقواعد</button>
+      </div>
+
+      <!-- Dynamic Tab Content Area -->
+      <div id="admin-tab-content">
+        <!-- Injected via switchAdminTab -->
+      </div>
+    </div>
+
+    <!-- Candidate Dossier Modal -->
+    <div id="candidate-dossier-modal" class="modal-backdrop">
+      <div class="modal-content" style="max-width:900px;">
+        <div class="modal-header">
+          <h3 id="dossier-candidate-name" style="color:var(--primary-gold);">الملف الشخصي للمتقدمة</h3>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('candidate-dossier-modal')">✕</button>
+        </div>
+        <div class="modal-body" id="dossier-modal-body">
+          <!-- Injected via openCandidateDossier -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Period Modal -->
+    <div id="create-period-modal" class="modal-backdrop">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 style="color:var(--primary-gold);">إنشاء فترة خلوة جديدة</h3>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('create-period-modal')">✕</button>
+        </div>
+        <form onsubmit="handleCreatePeriodSubmit(event)">
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label required">اسم الفترة</label>
+              <input type="text" id="cp-name" class="form-control" placeholder="مثال: فترة خلوة 1 يونيو - 4 يونيو" required />
+            </div>
+            <div class="grid grid-cols-2">
+              <div class="form-group">
+                <label class="form-label required">تاريخ البداية (الوصول)</label>
+                <input type="date" id="cp-start" class="form-control" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label required">تاريخ المغادرة</label>
+                <input type="date" id="cp-dep" class="form-control" required />
+              </div>
+            </div>
+            <div class="grid grid-cols-2">
+              <div class="form-group">
+                <label class="form-label required">السعة القصوى (عدد الأماكن)</label>
+                <input type="number" id="cp-cap" class="form-control" min="1" max="100" value="20" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label required">عدد الليالي</label>
+                <input type="number" id="cp-nights" class="form-control" min="1" max="14" value="3" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ملاحظات إدارية عن الفترة</label>
+              <textarea id="cp-notes" class="form-control" rows="2" placeholder="ملاحظات داخلية..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('create-period-modal')">إلغاء</button>
+            <button type="submit" class="btn btn-primary">إنشاء الفترة</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- WhatsApp Dispatcher Modal -->
+    <div id="whatsapp-modal" class="modal-backdrop">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 style="color:var(--primary-gold);">إرسال رسالة WhatsApp للمتقدمة</h3>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('whatsapp-modal')">✕</button>
+        </div>
+        <form onsubmit="handleWhatsAppSend(event)">
+          <div class="modal-body">
+            <input type="hidden" id="wa-profile-id" />
+            <div class="form-group">
+              <label class="form-label required">المستلمة</label>
+              <input type="text" id="wa-recipient-name" class="form-control" readonly />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">اختر قالب الرسالة</label>
+              <select id="wa-template-select" class="form-control" onchange="updateWhatsAppPreview(this.value)">
+                <option value="APPROVAL">رسالة الموافقة على الخلوة</option>
+                <option value="WAITLIST">رسالة الإدراج في قائمة الانتظار</option>
+                <option value="REJECTION">رسالة الاعتذار عن عدم القبول</option>
+                <option value="EXTENSION_APPROVED">رسالة الموافقة على طلب التمديد</option>
+                <option value="ADMIN_CONTACT">رسالة طلب التواصل مع الإدارة</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">نص الرسالة</label>
+              <textarea id="wa-message-body" class="form-control" rows="4"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('whatsapp-modal')">إلغاء</button>
+            <button type="submit" class="btn btn-primary" style="background:#25D366; border-color:#25D366; color:#fff;">
+              فتح وإرسال عبر WhatsApp
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  switchAdminTab('overview');
+}
+
+function togglePrivacyMode() {
+  adminState.privacyMode = !adminState.privacyMode;
+  showToast(`تم ${adminState.privacyMode ? 'تفعيل' : 'تعطيل'} وضع الخصوصية`, 'info');
+  renderAdminDashboard(document.getElementById('main-content'));
+}
+
+async function switchAdminTab(tabKey) {
+  adminState.currentTab = tabKey;
+  const tabsNav = document.getElementById('admin-main-tabs');
+  if (tabsNav) {
+    Array.from(tabsNav.children).forEach(btn => btn.classList.remove('active'));
+    event && event.target && event.target.classList.add('active');
+  }
+
+  const contentArea = document.getElementById('admin-tab-content');
+  if (!contentArea) return;
+
+  if (tabKey === 'overview') {
+    await renderOverviewTab(contentArea);
+  } else if (tabKey === 'periods') {
+    await renderPeriodsTab(contentArea);
+  } else if (tabKey === 'bookings') {
+    await renderBookingsTab(contentArea);
+  } else if (tabKey === 'gate') {
+    await renderGateCheckinTab(contentArea);
+  } else if (tabKey === 'reports') {
+    await renderReportsTab(contentArea);
+  } else if (tabKey === 'duplicates') {
+    await renderDuplicatesAuditTab(contentArea);
+  } else if (tabKey === 'staff') {
+    await renderStaffTab(contentArea);
+  } else if (tabKey === 'settings') {
+    await renderSettingsTab(contentArea);
+  }
+}
+
+// 1. Overview & Action Priorities Tab
+async function renderOverviewTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل إحصائيات لوحة القيادة...</p>`;
+  try {
+    const stats = await apiCall('/admin/dashboard-stats');
+    adminState.stats = stats;
+
+    const s = stats.summary;
+    const today = stats.today_actions;
+
+    container.innerHTML = `
+      <!-- Top Counter Cards -->
+      <div class="grid grid-cols-4" style="gap:16px; margin-bottom:28px;">
+        <div class="glass-card" style="border-right:4px solid #38BDF8;">
+          <div style="font-size:0.85rem; color:var(--text-muted);">طلبات قيد المراجعة</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#38BDF8;">${s.under_review}</div>
+          <small class="text-muted">من إجمالي ${s.total_bookings} طلب</small>
+        </div>
+
+        <div class="glass-card" style="border-right:4px solid #10B981;">
+          <div style="font-size:0.85rem; color:var(--text-muted);">المقبولات المعتمدة</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#10B981;">${s.approved}</div>
+          <small class="text-muted">حاضرات حالياً: ${s.checked_in}</small>
+        </div>
+
+        <div class="glass-card" style="border-right:4px solid #F59E0B;">
+          <div style="font-size:0.85rem; color:var(--text-muted);">قائمة الانتظار</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#F59E0B;">${s.waiting_list}</div>
+          <small class="text-muted">جاهزات للترقية</small>
+        </div>
+
+        <div class="glass-card" style="border-right:4px solid #F43F5E;">
+          <div style="font-size:0.85rem; color:var(--text-muted);">تنبيهات واستثناءات عاجلة</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#F43F5E;">${s.urgent_alerts + s.pending_exceptions}</div>
+          <small class="text-muted">تتطلب قرار الأم المسؤولة</small>
+        </div>
+      </div>
+
+      <!-- Today's Action Center (Arrivals & Departures) -->
+      <div class="grid grid-cols-2" style="gap:24px; margin-bottom:30px;">
+        <!-- Arrivals Today -->
+        <div class="glass-card gold-glow">
+          <div class="section-header">
+            <div class="section-title" style="font-size:1.15rem;">
+              <span>🧳</span> الواصلات اليوم (${today.arrivals_count})
+            </div>
+            <button class="btn btn-sm btn-outline-gold" onclick="switchAdminTab('gate')">كشف البوابة</button>
+          </div>
+          <div style="max-height:260px; overflow-y:auto;">
+            ${today.arrivals.length === 0 ? '<p class="text-muted" style="font-size:0.9rem;">لا توجد وصولات مقررة لليوم.</p>' : today.arrivals.map(a => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(15,23,42,0.4); border-radius:8px; margin-bottom:8px;">
+                <div>
+                  <strong>${a.full_name}</strong>
+                  <div class="text-muted" style="font-size:0.8rem;">${a.church} - ${a.diocese}</div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm btn-success" onclick="fastCheckin('${a.booking_id}')">وصلت ✓</button>
+                  <button class="btn btn-sm btn-secondary" onclick="openWhatsAppModal('${a.booking_id}', '${a.full_name}')">WhatsApp</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Departures Today -->
+        <div class="glass-card">
+          <div class="section-header">
+            <div class="section-title" style="font-size:1.15rem;">
+              <span>🏁</span> المغادرات اليوم (${today.departures_count})
+            </div>
+          </div>
+          <div style="max-height:260px; overflow-y:auto;">
+            ${today.departures.length === 0 ? '<p class="text-muted" style="font-size:0.9rem;">لا توجد مغادرات لليوم.</p>' : today.departures.map(d => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(15,23,42,0.4); border-radius:8px; margin-bottom:8px;">
+                <div>
+                  <strong>${d.full_name}</strong>
+                  <div class="text-muted" style="font-size:0.8rem;">${d.church}</div>
+                </div>
+                <span class="badge badge-completed">المغادرة قبل 9:00 ص</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الإحصائيات.</p>`;
+  }
+}
+
+// 2. Periods Management Tab
+async function renderPeriodsTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل الفترات...</p>`;
+  try {
+    const periods = await apiCall('/periods/admin/all');
+    adminState.periods = periods;
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="color:var(--primary-gold);">سجل فترات الخلوة (الحالية والقادمة والأرشيف)</h3>
+        <button class="btn btn-primary" onclick="openCreatePeriodModal()">+ إنشاء فترة جديدة</button>
+      </div>
+
+      <div class="glass-card">
+        <div class="table-responsive">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>اسم الفترة</th>
+                <th>البداية</th>
+                <th>المغادرة</th>
+                <th>السعة</th>
+                <th>المقبول</th>
+                <th>المتبقي</th>
+                <th>الحالة</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${periods.map(p => `
+                <tr>
+                  <td><strong>${p.period_name}</strong></td>
+                  <td>${p.start_date}</td>
+                  <td>${p.departure_date}</td>
+                  <td>${p.capacity}</td>
+                  <td><span class="badge badge-approved">${p.approved_count}</span></td>
+                  <td><strong style="color:var(--primary-gold);">${p.remaining_spots}</strong></td>
+                  <td><span class="badge badge-${p.status.toLowerCase()}">${p.status}</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-secondary" onclick="viewPeriodWaitlist('${p.id}')">قائمة الانتظار</button>
+                    <a class="btn btn-sm btn-outline-gold" href="/api/v1/reports/gate-pdf/${p.id}" target="_blank">PDF البوابة</a>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الفترات.</p>`;
+  }
+}
+
+// 3. Bookings Search & Filter Tab
+async function renderBookingsTab(container) {
+  container.innerHTML = `
+    <!-- Search & Filter Controls -->
+    <div class="glass-card" style="margin-bottom:20px;">
+      <div class="grid grid-cols-4" style="gap:12px;">
+        <div class="form-group" style="grid-column: span 2; margin-bottom:0;">
+          <input type="text" id="admin-search-input" class="form-control" placeholder="بحث بالاسم، الهاتف، الكنيسة، الإبراشية، أو كود الحجز..." onkeyup="handleBookingSearch(event)" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <select id="admin-status-filter" class="form-control" onchange="handleBookingFilter()">
+            <option value="">جميع الحالات</option>
+            <option value="UNDER_REVIEW">قيد المراجعة</option>
+            <option value="APPROVED">مقبول</option>
+            <option value="WAITING_LIST">قائمة الانتظار</option>
+            <option value="REJECTED">مرفوض</option>
+            <option value="CHECKED_IN">حاضرة (Checked In)</option>
+            <option value="COMPLETED">مكتمل</option>
+            <option value="CANCELLED">معتذرة</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary" style="flex-grow:1;" onclick="handleBookingFilter()">تصفية</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bookings Table -->
+    <div class="glass-card">
+      <div id="admin-bookings-table-container">
+        <p class="text-muted">جاري تحميل الحجوزات...</p>
+      </div>
+    </div>
+  `;
+
+  loadAdminBookings();
+}
+
+async function loadAdminBookings(params = {}) {
+  const container = document.getElementById('admin-bookings-table-container');
+  if (!container) return;
+
+  const q = document.getElementById('admin-search-input')?.value || '';
+  const status = document.getElementById('admin-status-filter')?.value || '';
+
+  try {
+    let url = `/admin/bookings?skip=0&limit=100`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
+    if (status) url += `&status_filter=${status}`;
+
+    const bookings = await apiCall(url);
+
+    if (!bookings || bookings.length === 0) {
+      container.innerHTML = `<p class="text-muted" style="text-align:center; padding:20px;">لا توجد نتائج مطابقة لبحثك.</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>كود الحجز</th>
+              <th>الاسم</th>
+              <th>المحافظة</th>
+              <th>الكنيسة</th>
+              <th>رقم الهاتف</th>
+              <th>الفترة</th>
+              <th>الحالة</th>
+              <th>تنبيه</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bookings.map(b => {
+              const p = b.profile || {};
+              const phoneDisplay = maskPhone(p.phone_number);
+              return `
+                <tr>
+                  <td><strong>${b.booking_reference}</strong></td>
+                  <td>
+                    <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" style="color:var(--primary-gold); font-weight:700; text-decoration:none;">
+                      ${p.full_name || '-'}
+                    </a>
+                  </td>
+                  <td>${p.governorate || '-'}</td>
+                  <td>${p.church || '-'}</td>
+                  <td><span class="${adminState.privacyMode ? 'privacy-masked' : ''}">${phoneDisplay}</span></td>
+                  <td>${b.period ? b.period.period_name : '-'}</td>
+                  <td><span class="badge badge-${b.status.toLowerCase()}">${b.status}</span></td>
+                  <td>
+                    ${p.has_active_warning ? '<span class="badge badge-rejected" title="توجد ملاحظات أو مخالفات سابقة">⚠️ تنبيه</span>' : '<span style="color:#10B981;">سليم</span>'}
+                  </td>
+                  <td>
+                    <div style="display:flex; gap:6px;">
+                      ${b.status === 'UNDER_REVIEW' || b.status === 'SUBMITTED' ? `
+                        <button class="btn btn-sm btn-success" onclick="approveBookingAdmin('${b.id}')">قبول ✓</button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectBookingAdmin('${b.id}')">رفض ✕</button>
+                      ` : ''}
+                      <button class="btn btn-sm btn-secondary" onclick="openCandidateDossier('${p.id}')">الملف</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الحجوزات.</p>`;
+  }
+}
+
+function handleBookingSearch(event) {
+  if (event.key === 'Enter') {
+    loadAdminBookings();
+  }
+}
+
+function handleBookingFilter() {
+  loadAdminBookings();
+}
+
+// 4. Candidate Full Dossier Modal
+async function openCandidateDossier(profileId) {
+  const modal = document.getElementById('candidate-dossier-modal');
+  const body = document.getElementById('dossier-modal-body');
+  const title = document.getElementById('dossier-candidate-name');
+
+  body.innerHTML = `<p class="text-muted">جاري تحميل الملف الكامل للمتقدمة...</p>`;
+  openModal('candidate-dossier-modal');
+
+  try {
+    const dossier = await apiCall(`/admin/applicant/${profileId}`);
+    adminState.selectedCandidate = dossier;
+    const p = dossier.profile;
+
+    title.innerText = `ملف المتقدمة: ${p.full_name}`;
+
+    body.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; border-bottom:1px solid var(--border-subtle); padding-bottom:14px;">
+        <div>
+          <div style="font-size:1.2rem; font-weight:800; color:var(--text-primary);">${p.full_name}</div>
+          <div class="text-muted">${p.church} - ${p.diocese} (${p.governorate})</div>
+          <div>رقم الهاتف: <strong>${p.phone_number}</strong> | تاريخ الميلاد: <strong>${p.birth_date}</strong></div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline-gold" onclick="openWhatsAppModal('${p.id}', '${p.full_name}')">
+            📲 مراسلة WhatsApp
+          </button>
+        </div>
+      </div>
+
+      <!-- Dossier Tabs -->
+      <div class="tabs-nav" id="dossier-sub-tabs">
+        <button class="tab-btn active" onclick="switchDossierTab('history')">📜 سجل الخلوات (${dossier.bookings_count})</button>
+        <button class="tab-btn" onclick="switchDossierTab('notes')">🔒 الملاحظات السرية (${dossier.notes.length})</button>
+        <button class="tab-btn" onclick="switchDossierTab('violations')">⚠️ المخالفات (${dossier.violations.length})</button>
+        <button class="tab-btn" onclick="switchDossierTab('docs')">📁 المستندات والبطاقة (${p.documents.length})</button>
+      </div>
+
+      <div id="dossier-tab-content" style="margin-top:16px;">
+        <!-- Injected via switchDossierTab -->
+      </div>
+    `;
+
+    switchDossierTab('history');
+  } catch (err) {
+    body.innerHTML = `<p style="color:#F43F5E;">فشل تحميل ملف المتقدمة.</p>`;
+  }
+}
+
+function switchDossierTab(tabKey) {
+  const d = adminState.selectedCandidate;
+  if (!d) return;
+
+  const content = document.getElementById('dossier-tab-content');
+  if (!content) return;
+
+  if (tabKey === 'history') {
+    content.innerHTML = `
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>كود الحجز</th>
+              <th>الفترة</th>
+              <th>الحالة</th>
+              <th>تاريخ التقديم</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${d.bookings.map(b => `
+              <tr>
+                <td><strong>${b.booking_reference}</strong></td>
+                <td>${b.period ? b.period.period_name : '-'}</td>
+                <td><span class="badge badge-${b.status.toLowerCase()}">${b.status}</span></td>
+                <td>${b.created_at.slice(0,10)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (tabKey === 'notes') {
+    content.innerHTML = `
+      <div style="margin-bottom:16px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-sm btn-primary" onclick="showAddNoteForm('${d.profile.id}')">+ تسجيل ملاحظة إدارية خاصة</button>
+      </div>
+      <div id="add-note-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px;">
+        <h4 style="color:var(--primary-gold); margin-bottom:10px;">إضافة ملاحظة إدارية سرية جديدة</h4>
+        <textarea id="new-note-content" class="form-control" rows="3" placeholder="اكتبي الملاحظة هنا..."></textarea>
+        <div class="grid grid-cols-2" style="margin-top:10px;">
+          <div>
+            <label class="form-label">مستوى الأهمية / الخطورة</label>
+            <select id="new-note-severity" class="form-control">
+              <option value="NORMAL">عادي (Normal)</option>
+              <option value="HIGH">مهم / مرتفع (High)</option>
+              <option value="CRITICAL">حرج / تحذيري (Critical)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">التوصية المستقبلية</label>
+            <select id="new-note-rec" class="form-control">
+              <option value="NONE">بدون توصية</option>
+              <option value="BAN_BOOKING">منع الحجز مستقبلاً</option>
+              <option value="CONDITIONAL_APPROVAL">حجز بشروط</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="btn btn-sm btn-primary" onclick="saveAdminNote('${d.profile.id}')">حفظ الملاحظة</button>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('add-note-form-area').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+
+      <div>
+        ${d.notes.length === 0 ? '<p class="text-muted">لا توجد ملاحظات إدارية مسجلة لهذه المتقدمة.</p>' : d.notes.map(n => `
+          <div style="background:rgba(15,23,42,0.5); padding:12px 16px; border-radius:8px; margin-bottom:10px; border-right:4px solid ${n.severity==='CRITICAL'?'#F43F5E':n.severity==='HIGH'?'#F59E0B':'#38BDF8'};">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <strong style="color:var(--text-primary);">${n.note_type} (${n.severity})</strong>
+              <small class="text-muted">${n.created_at.slice(0,16).replace('T', ' ')}</small>
+            </div>
+            <p style="font-size:0.92rem; color:var(--text-secondary);">${n.content}</p>
+            ${n.recommendation !== 'NONE' ? `<div style="font-size:0.8rem; color:#F59E0B; margin-top:4px;">التوصية: ${n.recommendation}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (tabKey === 'violations') {
+    content.innerHTML = `
+      <div style="margin-bottom:16px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-sm btn-danger" onclick="showAddViolationForm('${d.profile.id}')">+ تسجيل مخالفة</button>
+      </div>
+      <div id="add-violation-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border:1px solid rgba(244,63,94,0.3);">
+        <h4 style="color:#F43F5E; margin-bottom:10px;">تسجيل مخالفة جديدة</h4>
+        <input type="text" id="new-viol-title" class="form-control" placeholder="عنوان المخالفة" style="margin-bottom:10px;" />
+        <textarea id="new-viol-desc" class="form-control" rows="3" placeholder="تفاصيل المخالفة..."></textarea>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="btn btn-sm btn-danger" onclick="saveViolation('${d.profile.id}')">حفظ المخالفة</button>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('add-violation-form-area').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+
+      <div>
+        ${d.violations.length === 0 ? '<p class="text-muted">لا توجد مخالفات مسجلة.</p>' : d.violations.map(v => `
+          <div style="background:rgba(244,63,94,0.1); padding:12px 16px; border-radius:8px; margin-bottom:10px; border-right:4px solid #F43F5E;">
+            <div style="font-weight:700; color:#FDA4AF; margin-bottom:4px;">${v.violation_title}</div>
+            <p style="font-size:0.9rem; color:var(--text-secondary);">${v.violation_description}</p>
+            <small class="text-muted">${v.occurred_at}</small>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (tabKey === 'docs') {
+    content.innerHTML = `
+      <div class="grid grid-cols-2" style="gap:16px;">
+        ${d.profile.documents.length === 0 ? '<p class="text-muted">لم يتم رفع مستندات حتى الآن.</p>' : d.profile.documents.map(doc => `
+          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:8px; border:1px solid var(--border-subtle);">
+            <div style="font-weight:700; color:var(--primary-gold); margin-bottom:6px;">${doc.doc_type}</div>
+            <div class="text-muted" style="font-size:0.8rem; margin-bottom:10px;">${doc.file_name} (${(doc.file_size_bytes/1024).toFixed(1)} KB)</div>
+            <a class="btn btn-sm btn-outline-gold" href="/api/v1/profile/document/${doc.id}" target="_blank">
+              👁 استعراض المستند بأمان (مسجل بالـ Audit)
+            </a>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+function showAddNoteForm(profId) {
+  document.getElementById('add-note-form-area').style.display = 'block';
+}
+
+async function saveAdminNote(profId) {
+  const content = document.getElementById('new-note-content').value;
+  const severity = document.getElementById('new-note-severity').value;
+  const recommendation = document.getElementById('new-note-rec').value;
+
+  if (!content) return showToast('يرجى كتابة نص الملاحظة', 'warning');
+
+  try {
+    await apiCall('/admin-notes/notes', {
+      method: 'POST',
+      body: {
+        profile_id: profId,
+        content: content,
+        severity: severity,
+        recommendation: recommendation
+      }
+    });
+
+    showToast('تم حفظ الملاحظة الإدارية بنجاح', 'success');
+    openCandidateDossier(profId);
+  } catch (err) {
+    showToast(err.message || 'فشل حفظ الملاحظة', 'danger');
+  }
+}
+
+function showAddViolationForm(profId) {
+  document.getElementById('add-violation-form-area').style.display = 'block';
+}
+
+async function saveViolation(profId) {
+  const title = document.getElementById('new-viol-title').value;
+  const desc = document.getElementById('new-viol-desc').value;
+
+  if (!title || !desc) return showToast('يرجى استكمال بيانات المخالفة', 'warning');
+
+  try {
+    await apiCall('/admin-notes/violations', {
+      method: 'POST',
+      body: {
+        profile_id: profId,
+        violation_title: title,
+        violation_description: desc
+      }
+    });
+
+    showToast('تم تسجيل المخالفة بنجاح', 'success');
+    openCandidateDossier(profId);
+  } catch (err) {
+    showToast(err.message || 'فشل تسجيل المخالفة', 'danger');
+  }
+}
+
+// 5. Gate Reception & Check-in Tab
+async function renderGateCheckinTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل كشوف الاستقبال للبوابة...</p>`;
+  try {
+    const periods = await apiCall('/periods/admin/all');
+    const openPeriods = periods.filter(p => p.status !== 'CANCELLED');
+
+    container.innerHTML = `
+      <div class="glass-card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h3 style="color:var(--primary-gold);">🚪 كشف استقبال البوابة وتسجيل الوصول</h3>
+            <p class="text-muted" style="font-size:0.85rem;">تسجيل وصول النزيلات، تخصيص القلالي، وطباعة الكشوفات الورقية</p>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="gate-period-select" class="form-control" style="width:250px;" onchange="loadGatePeriodSheet(this.value)">
+              ${openPeriods.map(p => `<option value="${p.id}">${p.period_name}</option>`).join('')}
+            </select>
+            <button class="btn btn-outline-gold" onclick="downloadGateSheetPDF()">
+              📄 طباعة / تحميل PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div id="gate-sheet-table-container">
+          <!-- Injected via loadGatePeriodSheet -->
+        </div>
+      </div>
+    `;
+
+    if (openPeriods.length > 0) {
+      loadGatePeriodSheet(openPeriods[0].id);
+    }
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل كشف الاستقبال.</p>`;
+  }
+}
+
+async function loadGatePeriodSheet(periodId) {
+  const container = document.getElementById('gate-sheet-table-container');
+  if (!container) return;
+
+  try {
+    const items = await apiCall(`/attendance/period/${periodId}`);
+    if (!items || items.length === 0) {
+      container.innerHTML = `<p class="text-muted" style="text-align:center; padding:20px;">لا توجد نزيلات مقبولة مسجلة لهذه الفترة حتى الآن.</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>كود الحجز</th>
+              <th>الاسم الكامل</th>
+              <th>المحافظة والكنيسة</th>
+              <th>رقم الهاتف</th>
+              <th>حالة الحضور</th>
+              <th>القلاية / الغرفة</th>
+              <th>الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td><strong>${item.booking_reference}</strong></td>
+                <td><strong>${item.profile_name}</strong></td>
+                <td>${item.church} - ${item.governorate}</td>
+                <td>${maskPhone(item.phone_number)}</td>
+                <td>
+                  <span class="badge ${item.attendance_status === 'CHECKED_IN' ? 'badge-approved' : 'badge-under_review'}">
+                    ${item.attendance_status === 'CHECKED_IN' ? 'حاضرة (Checked In)' : 'بانتظار الوصول'}
+                  </span>
+                </td>
+                <td>
+                  <input type="text" id="room-${item.booking_id}" class="form-control" style="width:110px; padding:6px 10px;" value="${item.room_or_cell_number || ''}" placeholder="رقم القلاية" />
+                </td>
+                <td>
+                  ${item.attendance_status !== 'CHECKED_IN' ? `
+                    <button class="btn btn-sm btn-success" onclick="confirmGateCheckin('${item.booking_id}')">
+                      وصلت ✓
+                    </button>
+                  ` : `
+                    <button class="btn btn-sm btn-secondary" onclick="updateRoomNumber('${item.booking_id}')">
+                      تحديث القلاية
+                    </button>
+                  `}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل النزيلات.</p>`;
+  }
+}
+
+async function confirmGateCheckin(bookingId) {
+  const room = document.getElementById(`room-${bookingId}`)?.value || '';
+  try {
+    await apiCall('/attendance/check-in', {
+      method: 'POST',
+      body: {
+        booking_id: bookingId,
+        room_or_cell_number: room
+      }
+    });
+
+    showToast('تم تسجيل الحضور بنجاح!', 'success');
+    const periodId = document.getElementById('gate-period-select')?.value;
+    if (periodId) loadGatePeriodSheet(periodId);
+  } catch (err) {
+    showToast(err.message || 'فشل تسجيل الحضور', 'danger');
+  }
+}
+
+function downloadGateSheetPDF() {
+  const periodId = document.getElementById('gate-period-select')?.value;
+  if (!periodId) return;
+  window.open(`/api/v1/reports/gate-pdf/${periodId}`, '_blank');
+}
+
+// Fast check-in from Overview
+async function fastCheckin(bookingId) {
+  try {
+    await apiCall('/attendance/check-in', {
+      method: 'POST',
+      body: { booking_id: bookingId }
+    });
+    showToast('تم تسجيل الوصول بنجاح!', 'success');
+    switchAdminTab('overview');
+  } catch (err) {
+    showToast(err.message || 'فشل تسجيل الوصول', 'danger');
+  }
+}
+
+// 6. Reports & Analytics Tab
+async function renderReportsTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل التقارير والإحصائيات...</p>`;
+  try {
+    const analytics = await apiCall('/reports/analytics');
+    const periods = await apiCall('/periods/admin/all');
+
+    container.innerHTML = `
+      <div class="grid grid-cols-3" style="gap:20px; margin-bottom:24px;">
+        <div class="glass-card">
+          <div style="color:var(--text-muted); font-size:0.85rem;">إجمالي الملفات المسجلة</div>
+          <div style="font-size:1.8rem; font-weight:800; color:var(--primary-gold);">${analytics.total_registered_profiles}</div>
+        </div>
+        <div class="glass-card">
+          <div style="color:var(--text-muted); font-size:0.85rem;">الخلوات المكتملة بنجاح</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#10B981;">${analytics.total_completed_retreats}</div>
+        </div>
+        <div class="glass-card">
+          <div style="color:var(--text-muted); font-size:0.85rem;">حالات عدم الحضور (No Show)</div>
+          <div style="font-size:1.8rem; font-weight:800; color:#F43F5E;">${analytics.total_no_shows}</div>
+        </div>
+      </div>
+
+      <!-- Breakdown Tables -->
+      <div class="grid grid-cols-2" style="gap:24px;">
+        <div class="glass-card">
+          <h4 style="color:var(--primary-gold); margin-bottom:14px;">📍 الحجوزات حسب المحافظة</h4>
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead><tr><th>المحافظة</th><th>عدد الحجوزات</th></tr></thead>
+              <tbody>
+                ${analytics.governorate_breakdown.map(g => `<tr><td>${g.governorate}</td><td><strong>${g.count}</strong></td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <h4 style="color:var(--primary-gold); margin-bottom:14px;">⛪ الحجوزات حسب الإبراشية والكنيسة</h4>
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead><tr><th>الكنيسة</th><th>عدد الحجوزات</th></tr></thead>
+              <tbody>
+                ${analytics.church_breakdown.map(c => `<tr><td>${c.church}</td><td><strong>${c.count}</strong></td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل التقارير.</p>`;
+  }
+}
+
+// 7. Staff & Supervisors Management Tab
+async function renderStaffTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل فريق الإشراف...</p>`;
+  try {
+    const staffList = await apiCall('/staff');
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+          <h3 style="color:var(--primary-gold);">👥 إدارة المشرفين والصلاحيات (Granular RBAC)</h3>
+          <p class="text-muted" style="font-size:0.85rem;">منح الصلاحيات الدقيقة لفريق الاستقبال والبوابة ومتابعة الحجوزات</p>
+        </div>
+        <button class="btn btn-primary" onclick="showCreateStaffModal()">+ إضافة مشرف جديد</button>
+      </div>
+
+      <div class="glass-card">
+        <div class="table-responsive">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>البريد الإلكتروني</th>
+                <th>الدور والصلاحية</th>
+                <th>الحالة</th>
+                <th>تاريخ الإنشاء</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${staffList.map(s => `
+                <tr>
+                  <td><strong>${s.email}</strong></td>
+                  <td><span class="badge badge-under_review">${s.role}</span></td>
+                  <td><span class="badge ${s.is_active ? 'badge-approved' : 'badge-rejected'}">${s.is_active ? 'مفعّل' : 'معطل'}</span></td>
+                  <td>${s.created_at.slice(0,10)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل المشرفين.</p>`;
+  }
+}
+
+// 8. System Settings & Rules Tab
+async function renderSettingsTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري تحميل إعدادات النظام...</p>`;
+  try {
+    const settings = await apiCall('/settings');
+
+    container.innerHTML = `
+      <div class="glass-card" style="max-width:750px;">
+        <h3 style="color:var(--primary-gold); margin-bottom:20px;">⚙️ قواعد وسياسات بيت الخلوة القابلة للتعديل</h3>
+        <form onsubmit="handleSettingsUpdate(event)">
+          <div class="grid grid-cols-2">
+            <div class="form-group">
+              <label class="form-label required">الحد الأدنى للفاصل بين الخلوات (بالأشهر)</label>
+              <input type="number" id="set-min-interval" class="form-control" min="1" max="12" value="${settings.min_booking_interval_months}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">السعة الاستيعابية الافتراضية للفترة</label>
+              <input type="number" id="set-cap" class="form-control" min="1" max="100" value="${settings.default_period_capacity}" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2">
+            <div class="form-group">
+              <label class="form-label required">رقم WhatsApp الرسمي للدير</label>
+              <input type="text" id="set-wa" class="form-control" value="${settings.whatsapp_official_number}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">رقم هاتف الاستقبال والبوابة</label>
+              <input type="text" id="set-phone" class="form-control" value="${settings.reception_contact_phone}" required />
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top:15px;">
+            حفظ التعديلات
+          </button>
+        </form>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الإعدادات.</p>`;
+  }
+}
+
+async function handleSettingsUpdate(event) {
+  event.preventDefault();
+  const minInterval = parseInt(document.getElementById('set-min-interval').value);
+  const cap = parseInt(document.getElementById('set-cap').value);
+  const wa = document.getElementById('set-wa').value;
+  const phone = document.getElementById('set-phone').value;
+
+  try {
+    await apiCall('/settings', {
+      method: 'PUT',
+      body: {
+        min_booking_interval_months: minInterval,
+        default_period_capacity: cap,
+        whatsapp_official_number: wa,
+        reception_contact_phone: phone
+      }
+    });
+
+    showToast('تم تحديث قواعد وسياسات النظام بنجاح', 'success');
+  } catch (err) {
+    showToast(err.message || 'فشل تحديث الإعدادات', 'danger');
+  }
+}
+
+// Approve / Reject Actions
+async function approveBookingAdmin(bookingId) {
+  try {
+    await apiCall(`/admin/bookings/${bookingId}/approve`, { method: 'POST' });
+    showToast('تمت الموافقة على الحجز بنجاح', 'success');
+    loadAdminBookings();
+  } catch (err) {
+    showToast(err.message || 'فشل قبول الحجز', 'danger');
+  }
+}
+
+async function rejectBookingAdmin(bookingId) {
+  const reason = prompt('يرجى كتابة سبب رفض الطلب:');
+  if (reason === null) return;
+
+  try {
+    await apiCall(`/admin/bookings/${bookingId}/reject`, {
+      method: 'POST',
+      body: { rejection_reason: reason, show_rejection_reason_to_user: true }
+    });
+    showToast('تم رفض الحجز وتسجيل السبب', 'info');
+    loadAdminBookings();
+  } catch (err) {
+    showToast(err.message || 'فشل رفض الحجز', 'danger');
+  }
+}
+
+// WhatsApp Dispatch Modal Helpers
+function openWhatsAppModal(profileId, candidateName) {
+  document.getElementById('wa-profile-id').value = profileId;
+  document.getElementById('wa-recipient-name').value = candidateName;
+  updateWhatsAppPreview('APPROVAL');
+  openModal('whatsapp-modal');
+}
+
+function updateWhatsAppPreview(templateKey) {
+  const templates = {
+    'APPROVAL': 'سلام ونعمة من دير القديسة دميانة ببراري بلقاس. يسرنا إبلاغكِ بالموافقة على طلب الخلوة. موعد الوصول الساعة 12:00 ظهراً. برجاء إحضار أصل البطاقة الشخصية والأجبية والكتاب المقدس.',
+    'WAITLIST': 'سلام ونعمة من بيت الخلوة بدير القديسة دميانة. تم تسجيل طلبكِ في قائمة الانتظار لاكتمال السعة. سيصلكِ إشعار فور توفر أي مكان شاغر.',
+    'REJECTION': 'سلام ونعمة من دير القديسة دميانة. نعتذر عن عدم إمكانية قبول طلب الخلوة لهذه الفترة. نرجو لكِ كل البركة.',
+    'EXTENSION_APPROVED': 'سلام ونعمة. تمت موافقة الأم المسؤولة على طلب تمديد فترة الخلوة الخاص بكِ.',
+    'ADMIN_CONTACT': 'سلام ونعمة من إدارة بيت الخلوة بدير القديسة دميانة. نرجو التواصل معنا للأهمية بخصوص حجزكِ.'
+  };
+  document.getElementById('wa-message-body').value = templates[templateKey] || '';
+}
+
+async function handleWhatsAppSend(event) {
+  event.preventDefault();
+  const profileId = document.getElementById('wa-profile-id').value;
+  const templateKey = document.getElementById('wa-template-select').value;
+  const customMsg = document.getElementById('wa-message-body').value;
+
+  try {
+    const res = await apiCall('/communication/send-whatsapp', {
+      method: 'POST',
+      body: {
+        profile_id: profileId,
+        template_name: templateKey,
+        custom_message: customMsg
+      }
+    });
+
+    closeModal('whatsapp-modal');
+    showToast('تم تسجيل الرسالة وتوليد رابط الإرسال', 'success');
+    window.open(res.direct_link, '_blank');
+  } catch (err) {
+    showToast(err.message || 'فشل إرسال الرسالة', 'danger');
+  }
+}
+
+// Create Period Modal
+function openCreatePeriodModal() {
+  openModal('create-period-modal');
+}
+
+async function handleCreatePeriodSubmit(event) {
+  event.preventDefault();
+  const name = document.getElementById('cp-name').value;
+  const start = document.getElementById('cp-start').value;
+  const dep = document.getElementById('cp-dep').value;
+  const cap = parseInt(document.getElementById('cp-cap').value);
+  const nights = parseInt(document.getElementById('cp-nights').value);
+  const notes = document.getElementById('cp-notes').value;
+
+  try {
+    await apiCall('/periods', {
+      method: 'POST',
+      body: {
+        period_name: name,
+        start_date: start,
+        end_date: dep,
+        departure_date: dep,
+        capacity: cap,
+        nights_count: nights,
+        admin_notes: notes
+      }
+    });
+
+    closeModal('create-period-modal');
+    showToast('تم إنشاء فترة الخلوة بنجاح', 'success');
+    if (adminState.currentTab === 'periods') switchAdminTab('periods');
+    else switchAdminTab('overview');
+  } catch (err) {
+    showToast(err.message || 'فشل إنشاء الفترة', 'danger');
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Waitlist Management Modal & Handlers
+// ------------------------------------------------------------------------------
+async function viewPeriodWaitlist(periodId) {
+  let modal = document.getElementById('period-waitlist-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'period-waitlist-modal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:780px;">
+      <div class="modal-header">
+        <h3 style="color:var(--primary-gold);">⏳ قائمة الانتظار للفترة</h3>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('period-waitlist-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="waitlist-modal-body">
+        <p class="text-muted">جاري تحميل قائمة الانتظار...</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('period-waitlist-modal')">إغلاق</button>
+      </div>
+    </div>
+  `;
+
+  openModal('period-waitlist-modal');
+  const body = document.getElementById('waitlist-modal-body');
+
+  try {
+    const items = await apiCall(`/periods/${periodId}/waitlist`);
+    if (!items || items.length === 0) {
+      body.innerHTML = `<p class="text-muted" style="text-align:center; padding:20px;">لا توجد طلبات في قائمة الانتظار لهذه الفترة حالياً.</p>`;
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>الترتيب</th>
+              <th>الاسم</th>
+              <th>المحافظة والكنيسة</th>
+              <th>رقم الهاتف</th>
+              <th>تاريخ التقديم</th>
+              <th>الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td><span class="badge badge-waiting_list">#${it.queue_number}</span></td>
+                <td><strong>${it.profile_name}</strong></td>
+                <td>${it.church || '-'} (${it.governorate || '-'})</td>
+                <td>${maskPhone(it.profile_phone)}</td>
+                <td>${it.created_at ? it.created_at.slice(0, 10) : '-'}</td>
+                <td>
+                  <button class="btn btn-sm btn-success" onclick="promoteWaitlistUser('${it.id}', '${periodId}')">
+                    ترقية وقبول ✓
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<p style="color:#F43F5E;">فشل تحميل قائمة الانتظار: ${err.message || ''}</p>`;
+  }
+}
+
+async function promoteWaitlistUser(waitlistId, periodId) {
+  if (!confirm('هل ترغبين في ترقية هذه المتقدمة من قائمة الانتظار وقبول حجزها في الفترة؟')) return;
+
+  try {
+    await apiCall(`/admin/waitlist/${waitlistId}/promote`, { method: 'POST' });
+    showToast('تمت ترقية الحجز وقبوله بنجاح!', 'success');
+    viewPeriodWaitlist(periodId);
+    if (adminState.currentTab === 'periods') switchAdminTab('periods');
+    if (adminState.currentTab === 'overview') switchAdminTab('overview');
+  } catch (err) {
+    showToast(err.message || 'فشل ترقية الطلب', 'danger');
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Gate Room / Cell Number Update
+// ------------------------------------------------------------------------------
+async function updateRoomNumber(bookingId) {
+  const room = document.getElementById(`room-${bookingId}`)?.value || '';
+  try {
+    await apiCall('/attendance/check-in', {
+      method: 'POST',
+      body: {
+        booking_id: bookingId,
+        room_or_cell_number: room
+      }
+    });
+    showToast('تم تحديث رقم القلاية/الغرفة بنجاح!', 'success');
+  } catch (err) {
+    showToast(err.message || 'فشل تحديث رقم القلاية', 'danger');
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Staff & Supervisors Management Modal
+// ------------------------------------------------------------------------------
+function showCreateStaffModal() {
+  let modal = document.getElementById('create-staff-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'create-staff-modal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="color:var(--primary-gold);">+ إضافة حساب مشرف / مسؤولة جديد</h3>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('create-staff-modal')">✕</button>
+      </div>
+      <form onsubmit="handleCreateStaffSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label required">البريد الإلكتروني</label>
+            <input type="email" id="cs-email" class="form-control" placeholder="supervisor@stdemiana.org" required dir="ltr" />
+          </div>
+          <div class="form-group">
+            <label class="form-label required">كلمة المرور</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="cs-pass" class="form-control" placeholder="••••••••" required minlength="8" />
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cs-pass', this)" title="إظهار/إخفاء كلمة المرور">
+                👁️
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">الدور الوظيفي / الصلاحية</label>
+            <select id="cs-role" class="form-control" required>
+              <option value="BOOKING_SUPERVISOR">مشرفة مراجعة الحجوزات (Booking Supervisor)</option>
+              <option value="RECEPTION_SUPERVISOR">مشرفة الاستقبال والبوابة (Reception Supervisor)</option>
+              <option value="REPORT_SUPERVISOR">مشرفة التقارير والإحصائيات (Report Supervisor)</option>
+              <option value="CUSTOM_STAFF">عضو فريق خدمة بيت الخلوة (General Staff)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('create-staff-modal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">إنشاء الحساب</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openModal('create-staff-modal');
+}
+
+async function handleCreateStaffSubmit(event) {
+  event.preventDefault();
+  const email = document.getElementById('cs-email').value.trim();
+  const password = document.getElementById('cs-pass').value;
+  const role = document.getElementById('cs-role').value;
+
+  try {
+    await apiCall('/staff', {
+      method: 'POST',
+      body: { email, password, role }
+    });
+
+    closeModal('create-staff-modal');
+    showToast('تم إنشاء حساب المشرفة بنجاح!', 'success');
+    if (adminState.currentTab === 'staff') switchAdminTab('staff');
+  } catch (err) {
+    showToast(err.message || 'فشل إنشاء حساب المشرف', 'danger');
+  }
+}
+
+// 8. Duplicates & Correlation Audit Tab
+async function renderDuplicatesAuditTab(container) {
+  container.innerHTML = `<p class="text-muted">جاري فحص وتدقيق السجلات وقواعد البيانات لكشف أي تشابه أو تكرار...</p>`;
+  try {
+    const res = await apiCall('/admin/duplicates/audit');
+    const items = res.audit_items || [];
+
+    let itemsHtml = '';
+    if (items.length === 0) {
+      itemsHtml = `
+        <div style="text-align:center; padding:40px;" class="glass-card">
+          <div style="font-size:3rem; color:#10B981; margin-bottom:10px;">✓</div>
+          <h3 style="color:#10B981;">النظام نظيف تماماً من أي حسابات أو بيانات مكررة</h3>
+          <p class="text-muted">لم يتم رصد أي اشتراك مريب في أرقام الهواتف أو تطابق في الهويات بين المتقدمات.</p>
+        </div>
+      `;
+    } else {
+      itemsHtml = items.map(item => `
+        <div class="glass-card" style="margin-bottom:18px; border-right:4px solid #F59E0B;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="color:var(--primary-gold); font-size:1.05rem;">⚠️ ${item.label}</strong>
+              <span class="badge badge-under_review" style="margin-right:8px;">${item.count} حسابات متطابقة</span>
+            </div>
+          </div>
+          <table class="table" style="font-size:0.85rem;">
+            <thead>
+              <tr>
+                <th>اسم المتقدمة</th>
+                <th>الهاتف</th>
+                <th>الرقم القومي</th>
+                <th>المحافظة / الكنيسة</th>
+                <th>تاريخ التسجيل</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${item.profiles.map(p => `
+                <tr>
+                  <td><strong>${p.full_name}</strong></td>
+                  <td>${maskPhone(p.phone_number)}</td>
+                  <td>${p.national_id || '<span class="text-muted">غير مدخل</span>'}</td>
+                  <td>${p.governorate} – ${p.church}</td>
+                  <td>${p.created_at}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-gold" onclick="openCandidateDossier('${p.id}')">
+                      عرض الملف الكامل
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('');
+    }
+
+    container.innerHTML = `
+      <div class="section-header">
+        <div class="section-title">
+          <span>🛡️</span> منظومة التدقيق ومنع تكرار الحسابات
+        </div>
+        <button class="btn btn-sm btn-outline-gold" onclick="switchAdminTab('duplicates')">
+          🔄 إعادة الفحص الآن
+        </button>
+      </div>
+
+      <div class="alert-spiritual" style="margin-bottom:20px;">
+        💡 يراقب هذا المحرك الذكي أي محاولات لتكرار التسجيل أو استخدام نفس أرقام الهواتف أو تشابه الأسماء والبيانات لتفادي الازدواجية وضمان عدالة توزيع فترات الخلوة.
+      </div>
+
+      <div>
+        ${itemsHtml}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p class="text-danger">فشل تحميل تقرير تدقيق التكرار: ${err.message}</p>`;
+  }
+}
+
+
