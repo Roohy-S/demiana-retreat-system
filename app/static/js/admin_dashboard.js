@@ -69,45 +69,88 @@ async function renderAdminDashboard(container) {
 
     <!-- Create Period Modal -->
     <div id="create-period-modal" class="modal-backdrop">
-      <div class="modal-content">
+      <div class="modal-content" style="max-width:720px;">
         <div class="modal-header">
-          <h3 style="color:var(--primary-gold);">إنشاء فترة خلوة جديدة</h3>
+          <h3 style="color:var(--primary-gold); display:flex; align-items:center; gap:8px;">
+            <span>📅</span> إنشاء فترة خلوة جديدة بالدير
+          </h3>
           <button type="button" class="btn btn-sm btn-secondary" onclick="closeModal('create-period-modal')">✕</button>
         </div>
         <form onsubmit="handleCreatePeriodSubmit(event)">
           <div class="modal-body">
+            <!-- Quick Preset Durations -->
+            <div class="form-group" style="margin-bottom:16px;">
+              <label class="form-label" style="color:var(--text-gold);">⏱️ اختيار سريع لعدد الأيام والليالي:</label>
+              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <button type="button" class="btn btn-sm btn-outline-gold" onclick="setPeriodDurationPreset(3)">
+                  🌙 3 ليالي (4 أيام) - نهاية الأسبوع
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="setPeriodDurationPreset(4)">
+                  🌙 4 ليالي (5 أيام)
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="setPeriodDurationPreset(5)">
+                  🌙 5 ليالي (6 أيام)
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="setPeriodDurationPreset(7)">
+                  🌙 أسبوع كامل (7 ليالي)
+                </button>
+              </div>
+            </div>
+
+            <!-- Start & Departure Dates -->
+            <div class="grid grid-cols-2" style="margin-bottom:12px;">
+              <div class="form-group">
+                <label class="form-label required">📅 تاريخ الوصول / البداية (يوم-شهر-سنة)</label>
+                <input type="date" id="cp-start" class="form-control" required onchange="onPeriodDateChange('start')" />
+                <div id="cp-start-day-badge" style="font-size:0.82rem; color:var(--primary-gold); margin-top:4px; font-weight:600;"></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label required">🚪 تاريخ المغادرة / النهاية (يوم-شهر-سنة)</label>
+                <input type="date" id="cp-dep" class="form-control" required onchange="onPeriodDateChange('dep')" />
+                <div id="cp-dep-day-badge" style="font-size:0.82rem; color:var(--primary-gold); margin-top:4px; font-weight:600;"></div>
+              </div>
+            </div>
+
+            <!-- Live Summary Card -->
+            <div class="glass-card gold-glow" style="padding:14px 18px; margin-bottom:18px; background:rgba(212,175,55,0.08); border:1px dashed var(--primary-gold);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <strong style="color:var(--text-gold); font-size:0.95rem;">📊 ملخص مواعيد الخلوة المحسوبة:</strong>
+                <span id="cp-live-duration-badge" class="badge badge-approved" style="font-size:0.85rem;">3 ليالي (4 أيام)</span>
+              </div>
+              <div id="cp-live-dates-summary" style="font-size:0.88rem; color:var(--text-secondary); line-height:1.7;">
+                <!-- Dynamically generated -->
+              </div>
+            </div>
+
             <div class="form-group">
-              <label class="form-label required">اسم الفترة</label>
-              <input type="text" id="cp-name" class="form-control" placeholder="مثال: فترة خلوة 1 يونيو - 4 يونيو" required />
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <label class="form-label required" style="margin-bottom:0;">اسم الفترة المقترح</label>
+                <button type="button" class="btn btn-sm btn-outline-gold" style="padding:2px 8px; font-size:0.75rem;" onclick="generateAndSetPeriodTitle()">
+                  🔄 إعادة توليد الاسم تلقائياً
+                </button>
+              </div>
+              <input type="text" id="cp-name" class="form-control" placeholder="اسم الفترة..." required />
             </div>
+
             <div class="grid grid-cols-2">
               <div class="form-group">
-                <label class="form-label required">تاريخ البداية (الوصول)</label>
-                <input type="date" id="cp-start" class="form-control" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label required">تاريخ المغادرة</label>
-                <input type="date" id="cp-dep" class="form-control" required />
-              </div>
-            </div>
-            <div class="grid grid-cols-2">
-              <div class="form-group">
-                <label class="form-label required">السعة القصوى (عدد الأماكن)</label>
+                <label class="form-label required">السعة القصوى (عدد الأسرة / النزيلات)</label>
                 <input type="number" id="cp-cap" class="form-control" min="1" max="100" value="20" required />
               </div>
               <div class="form-group">
-                <label class="form-label required">عدد الليالي</label>
-                <input type="number" id="cp-nights" class="form-control" min="1" max="14" value="3" required />
+                <label class="form-label required">عدد الليالي المحسوب</label>
+                <input type="number" id="cp-nights" class="form-control" min="1" max="30" value="3" required onchange="onPeriodNightsChange(this.value)" />
               </div>
             </div>
+
             <div class="form-group">
-              <label class="form-label">ملاحظات إدارية عن الفترة</label>
-              <textarea id="cp-notes" class="form-control" rows="2" placeholder="ملاحظات داخلية..."></textarea>
+              <label class="form-label">ملاحظات إدارية أو توجيهات خاصة بالفترة</label>
+              <textarea id="cp-notes" class="form-control" rows="2" placeholder="مثال: خاصة بطالبات ثانوي / أو مفتوحة للجميع..."></textarea>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeModal('create-period-modal')">إلغاء</button>
-            <button type="submit" class="btn btn-primary">إنشاء الفترة</button>
+            <button type="submit" class="btn btn-primary" style="min-width:140px;">✓ حفظ وإنشاء الفترة</button>
           </div>
         </form>
       </div>
@@ -301,8 +344,9 @@ async function renderPeriodsTab(container) {
             <thead>
               <tr>
                 <th>اسم الفترة</th>
-                <th>البداية</th>
-                <th>المغادرة</th>
+                <th>تاريخ الوصول (البداية)</th>
+                <th>تاريخ المغادرة (النهاية)</th>
+                <th>المدة بالأيام</th>
                 <th>السعة</th>
                 <th>المقبول</th>
                 <th>المتبقي</th>
@@ -314,15 +358,28 @@ async function renderPeriodsTab(container) {
               ${periods.map(p => `
                 <tr>
                   <td><strong>${p.period_name}</strong></td>
-                  <td>${p.start_date}</td>
-                  <td>${p.departure_date}</td>
+                  <td>
+                    <div style="font-weight:600; color:var(--text-primary);">${formatShortDate(p.start_date)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${p.arrival_time_desc || '12:00 ظ'}</div>
+                  </td>
+                  <td>
+                    <div style="font-weight:600; color:var(--text-primary);">${formatShortDate(p.departure_date)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${p.departure_time_desc || 'قبل 9:00 ص'}</div>
+                  </td>
+                  <td>
+                    <span class="badge badge-under_review" style="font-size:0.8rem;">
+                      🌙 ${p.nights_count} ليالي (${p.nights_count + 1} أيام)
+                    </span>
+                  </td>
                   <td>${p.capacity}</td>
                   <td><span class="badge badge-approved">${p.approved_count}</span></td>
                   <td><strong style="color:var(--primary-gold);">${p.remaining_spots}</strong></td>
-                  <td><span class="badge badge-${p.status.toLowerCase()}">${p.status}</span></td>
+                  <td><span class="badge badge-${p.status.toLowerCase()}">${p.status === 'OPEN' ? 'مفتوحة للحجز' : p.status === 'FULL' ? 'مكتملة' : p.status}</span></td>
                   <td>
-                    <button class="btn btn-sm btn-secondary" onclick="viewPeriodWaitlist('${p.id}')">قائمة الانتظار</button>
-                    <a class="btn btn-sm btn-outline-gold" href="/api/v1/reports/gate-pdf/${p.id}" target="_blank">PDF البوابة</a>
+                    <div style="display:flex; gap:6px;">
+                      <button class="btn btn-sm btn-secondary" onclick="viewPeriodWaitlist('${p.id}')">الانتظار</button>
+                      <a class="btn btn-sm btn-outline-gold" href="/api/v1/reports/gate-pdf/${p.id}" target="_blank">PDF</a>
+                    </div>
                   </td>
                 </tr>
               `).join('')}
@@ -1063,19 +1120,128 @@ async function handleWhatsAppSend(event) {
   }
 }
 
-// Create Period Modal
+// ==============================================================================
+// Interactive Period Creation Controller & Day-Based Helpers
+// ==============================================================================
 function openCreatePeriodModal() {
   openModal('create-period-modal');
+
+  // Initialize start date to tomorrow if not set
+  const today = new Date();
+  today.setDate(today.getDate() + 1);
+  const tomorrowStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  const startInput = document.getElementById('cp-start');
+  const depInput = document.getElementById('cp-dep');
+  const nightsInput = document.getElementById('cp-nights');
+  
+  if (startInput) startInput.value = tomorrowStr;
+  if (nightsInput) nightsInput.value = 3;
+  if (depInput) depInput.value = addDaysToDate(tomorrowStr, 3);
+  
+  updatePeriodModalLivePreview();
+}
+
+function setPeriodDurationPreset(nights) {
+  const startInput = document.getElementById('cp-start');
+  const depInput = document.getElementById('cp-dep');
+  const nightsInput = document.getElementById('cp-nights');
+  
+  const startDate = startInput?.value || addDaysToDate(new Date().toISOString().split('T')[0], 1);
+  if (nightsInput) nightsInput.value = nights;
+  if (depInput) depInput.value = addDaysToDate(startDate, nights);
+  
+  updatePeriodModalLivePreview();
+}
+
+function onPeriodDateChange(changedField) {
+  const startInput = document.getElementById('cp-start');
+  const depInput = document.getElementById('cp-dep');
+  const nightsInput = document.getElementById('cp-nights');
+
+  if (changedField === 'start') {
+    const nights = parseInt(nightsInput?.value || '3', 10);
+    if (startInput?.value && depInput) {
+      depInput.value = addDaysToDate(startInput.value, nights);
+    }
+  } else if (changedField === 'dep') {
+    if (startInput?.value && depInput?.value) {
+      const diff = calculateDateDifference(startInput.value, depInput.value);
+      if (diff > 0 && nightsInput) {
+        nightsInput.value = diff;
+      }
+    }
+  }
+
+  updatePeriodModalLivePreview();
+}
+
+function onPeriodNightsChange(nightsVal) {
+  const startInput = document.getElementById('cp-start');
+  const depInput = document.getElementById('cp-dep');
+  const nights = parseInt(nightsVal, 10) || 1;
+
+  if (startInput?.value && depInput) {
+    depInput.value = addDaysToDate(startInput.value, nights);
+  }
+
+  updatePeriodModalLivePreview();
+}
+
+function updatePeriodModalLivePreview() {
+  const startVal = document.getElementById('cp-start')?.value;
+  const depVal = document.getElementById('cp-dep')?.value;
+  const nightsVal = parseInt(document.getElementById('cp-nights')?.value || '3', 10);
+  const capVal = document.getElementById('cp-cap')?.value || '20';
+
+  const startBadge = document.getElementById('cp-start-day-badge');
+  const depBadge = document.getElementById('cp-dep-day-badge');
+  const durationBadge = document.getElementById('cp-live-duration-badge');
+  const summaryDiv = document.getElementById('cp-live-dates-summary');
+
+  if (startBadge) startBadge.innerText = startVal ? `يوم الوصول: ${formatArabicDate(startVal)}` : '';
+  if (depBadge) depBadge.innerText = depVal ? `يوم المغادرة: ${formatArabicDate(depVal)}` : '';
+
+  const totalDays = nightsVal + 1;
+  if (durationBadge) durationBadge.innerText = `🌙 ${nightsVal} ليالي (${totalDays} أيام)`;
+
+  if (summaryDiv && startVal && depVal) {
+    summaryDiv.innerHTML = `
+      <div>📅 <strong>الوصول (البدء):</strong> ${formatArabicDate(startVal)} (12:00 ظهراً)</div>
+      <div>🚪 <strong>المغادرة (الانتهاء):</strong> ${formatArabicDate(depVal)} (قبل 9:00 صباحاً)</div>
+      <div>🛏️ <strong>السعة المتاحة:</strong> ${capVal} سرير / نزيلة</div>
+    `;
+  }
+
+  generateAndSetPeriodTitle();
+}
+
+function generateAndSetPeriodTitle() {
+  const startVal = document.getElementById('cp-start')?.value;
+  const depVal = document.getElementById('cp-dep')?.value;
+  const nightsVal = parseInt(document.getElementById('cp-nights')?.value || '3', 10);
+  const nameInput = document.getElementById('cp-name');
+
+  if (startVal && depVal && nameInput) {
+    const startShort = formatDayMonthOnly(startVal);
+    const depShort = formatDayMonthOnly(depVal);
+    nameInput.value = `فترة خلوة: من ${startShort} إلى ${depShort} (${nightsVal} ليالي)`;
+  }
 }
 
 async function handleCreatePeriodSubmit(event) {
   event.preventDefault();
-  const name = document.getElementById('cp-name').value;
+  const name = document.getElementById('cp-name').value.trim();
   const start = document.getElementById('cp-start').value;
   const dep = document.getElementById('cp-dep').value;
-  const cap = parseInt(document.getElementById('cp-cap').value);
-  const nights = parseInt(document.getElementById('cp-nights').value);
-  const notes = document.getElementById('cp-notes').value;
+  const cap = parseInt(document.getElementById('cp-cap').value, 10);
+  const nights = parseInt(document.getElementById('cp-nights').value, 10);
+  const notes = document.getElementById('cp-notes').value.trim();
+
+  if (!start || !dep) {
+    showToast('يرجى تحديد تاريخ البداية وتاريخ المغادرة', 'warning');
+    return;
+  }
 
   try {
     await apiCall('/periods', {
@@ -1092,7 +1258,7 @@ async function handleCreatePeriodSubmit(event) {
     });
 
     closeModal('create-period-modal');
-    showToast('تم إنشاء فترة الخلوة بنجاح', 'success');
+    showToast(`تم إنشاء فترة الخلوة (${name}) بنجاح!`, 'success');
     if (adminState.currentTab === 'periods') switchAdminTab('periods');
     else switchAdminTab('overview');
   } catch (err) {

@@ -177,6 +177,98 @@ function updateNavUI() {
   }
 }
 
+// ==============================================================================
+// Arabic Date Formatters & Helpers (Day - Month - Year / يوم - شهر - سنة)
+// ==============================================================================
+const ARABIC_DAY_NAMES = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const ARABIC_MONTH_NAMES = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+];
+
+function formatArabicDate(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length !== 3) return dateStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    const dateObj = new Date(y, m - 1, d);
+    const dayName = ARABIC_DAY_NAMES[dateObj.getDay()] || '';
+    const monthName = ARABIC_MONTH_NAMES[m - 1] || '';
+    const padD = String(d).padStart(2, '0');
+    const padM = String(m).padStart(2, '0');
+    return `${dayName} ${padD}-${padM}-${y} (${padD} ${monthName} ${y})`;
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length !== 3) return dateStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    const dateObj = new Date(y, m - 1, d);
+    const dayName = ARABIC_DAY_NAMES[dateObj.getDay()] || '';
+    const padD = String(d).padStart(2, '0');
+    const padM = String(m).padStart(2, '0');
+    return `${dayName} ${padD}-${padM}-${y}`;
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function formatDayMonthOnly(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length !== 3) return dateStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    const dateObj = new Date(y, m - 1, d);
+    const dayName = ARABIC_DAY_NAMES[dateObj.getDay()] || '';
+    const monthName = ARABIC_MONTH_NAMES[m - 1] || '';
+    const padD = String(d).padStart(2, '0');
+    return `${dayName} ${padD} ${monthName}`;
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function addDaysToDate(dateStr, daysCount) {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    const dateObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dateObj.setDate(dateObj.getDate() + daysCount);
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+function calculateDateDifference(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return 0;
+  try {
+    const d1 = new Date(startDateStr);
+    const d2 = new Date(endDateStr);
+    const diffTime = d2.getTime() - d1.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
 // Privacy Mask Formatter
 function maskPhone(phone) {
   if (!AppState.privacyMode || !phone) return phone;

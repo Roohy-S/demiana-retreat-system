@@ -87,13 +87,21 @@ async def seed_database():
 
         print("[*] Seeding Retreat Periods...")
         today = date.today()
+        days_ar = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
+
+        def make_title(s_date, e_date, nights):
+            s_day = days_ar[s_date.weekday()]
+            e_day = days_ar[e_date.weekday()]
+            return f"فترة خلوة: من {s_day} {s_date.strftime('%d-%m-%Y')} إلى {e_day} {e_date.strftime('%d-%m-%Y')} ({nights} ليالي)"
 
         # Period 1: Open upcoming period (Arrival in 5 days)
+        p1_start = today + timedelta(days=5)
+        p1_end = today + timedelta(days=8)
         period1 = RetreatPeriod(
-            period_name="فترة خلوة 1 يونيو - 4 يونيو (الأولى)",
-            start_date=today + timedelta(days=5),
-            end_date=today + timedelta(days=8),
-            departure_date=today + timedelta(days=8),
+            period_name=make_title(p1_start, p1_end, 3),
+            start_date=p1_start,
+            end_date=p1_end,
+            departure_date=p1_end,
             arrival_time_desc="الساعة 12:00 ظهراً",
             departure_time_desc="قبل الساعة 9:00 صباحاً",
             nights_count=3,
@@ -105,11 +113,15 @@ async def seed_database():
         session.add(period1)
 
         # Period 2: Full period with active waitlist (Arrival in 12 days)
+        p2_start = today + timedelta(days=12)
+        p2_end = today + timedelta(days=15)
         period2 = RetreatPeriod(
-            period_name="فترة خلوة 10 يونيو - 13 يونيو (المكتملة)",
-            start_date=today + timedelta(days=12),
-            end_date=today + timedelta(days=15),
-            departure_date=today + timedelta(days=15),
+            period_name=make_title(p2_start, p2_end, 3) + " [مكتملة]",
+            start_date=p2_start,
+            end_date=p2_end,
+            departure_date=p2_end,
+            arrival_time_desc="الساعة 12:00 ظهراً",
+            departure_time_desc="قبل الساعة 9:00 صباحاً",
             nights_count=3,
             capacity=2,  # Small capacity for waitlist demonstration
             approved_count=2,
@@ -119,11 +131,15 @@ async def seed_database():
         session.add(period2)
 
         # Period 3: Current ongoing period (Arrived today!)
+        p3_start = today
+        p3_end = today + timedelta(days=3)
         period3 = RetreatPeriod(
-            period_name="فترة خلوة النصف الأخير من الشهر (الحالية)",
-            start_date=today,
-            end_date=today + timedelta(days=3),
-            departure_date=today + timedelta(days=3),
+            period_name=make_title(p3_start, p3_end, 3) + " [فترة الأسبوع الحالية]",
+            start_date=p3_start,
+            end_date=p3_end,
+            departure_date=p3_end,
+            arrival_time_desc="الساعة 12:00 ظهراً",
+            departure_time_desc="قبل الساعة 9:00 صباحاً",
             nights_count=3,
             capacity=15,
             approved_count=2,
@@ -133,11 +149,15 @@ async def seed_database():
         session.add(period3)
 
         # Period 4: Completed Historical Period
+        p4_start = today - timedelta(days=60)
+        p4_end = today - timedelta(days=57)
         period4 = RetreatPeriod(
-            period_name="فترة خلوة شهر مارس (أرشيف)",
-            start_date=today - timedelta(days=60),
-            end_date=today - timedelta(days=57),
-            departure_date=today - timedelta(days=57),
+            period_name=make_title(p4_start, p4_end, 3) + " (أرشيف سابق)",
+            start_date=p4_start,
+            end_date=p4_end,
+            departure_date=p4_end,
+            arrival_time_desc="الساعة 12:00 ظهراً",
+            departure_time_desc="قبل الساعة 9:00 صباحاً",
             nights_count=3,
             capacity=20,
             approved_count=18,

@@ -592,40 +592,53 @@ function renderStep(step) {
     `;
   } else if (step === 8) {
     title.innerText = 'الخطوة 8: اختيار فترة الخلوة والاستثناء';
-    desc.innerText = 'تحديد الموعد المناسب لطلب الخلوة بالدير';
+    desc.innerText = 'تحديد الموعد المناسب لطلب الخلوة بالدير بالأيام والليالي';
 
-    const periodsHtml = (wizardState.periods || []).map(p => `
-      <label class="period-select-card ${d.selected_period_id === p.id ? 'selected' : ''}" style="display:block; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid ${d.selected_period_id === p.id ? 'var(--primary-gold)' : 'var(--border-subtle)'}; cursor:pointer;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <input type="radio" name="w-period" value="${p.id}" ${d.selected_period_id === p.id ? 'checked' : ''} onchange="selectWizardPeriod('${p.id}')" />
-            <strong style="color:var(--text-gold); margin-right:8px;">${p.title}</strong>
+    const periodsHtml = (wizardState.periods || []).map(p => {
+      const isSelected = d.selected_period_id === p.id;
+      const isFull = p.status === 'FULL' || (p.remaining_spots !== undefined && p.remaining_spots <= 0);
+      const spotsCount = p.remaining_spots !== undefined ? p.remaining_spots : (p.capacity - (p.approved_count || 0));
+      const nightsCount = p.nights_count || 3;
+      const totalDays = nightsCount + 1;
+      const depDate = p.departure_date || p.end_date;
+
+      return `
+        <label class="period-select-card glass-card ${isSelected ? 'gold-glow' : ''}" 
+               style="display:block; padding:14px 16px; margin-bottom:12px; border-radius:12px; border:1.5px solid ${isSelected ? 'var(--primary-gold)' : 'var(--border-subtle)'}; cursor:pointer; background:${isSelected ? 'rgba(212,175,55,0.1)' : 'var(--bg-card)'};">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <input type="radio" name="w-period" value="${p.id}" ${isSelected ? 'checked' : ''} onchange="selectWizardPeriod('${p.id}')" style="accent-color:var(--primary-gold); width:18px; height:18px;" />
+              <strong style="color:var(--text-primary); font-size:1.05rem;">${p.period_name}</strong>
+            </div>
+            <span class="badge ${isFull ? 'badge-waiting_list' : 'badge-approved'}" style="font-size:0.8rem;">
+              ${isFull ? 'مكتملة (قائمة انتظار)' : `متاح ${spotsCount} سرير`}
+            </span>
           </div>
-          <span class="badge ${p.available_capacity > 0 ? 'badge-approved' : 'badge-under_review'}">
-            ${p.available_capacity > 0 ? `متاح ${p.available_capacity} سرير` : 'قائمة انتظار'}
-          </span>
-        </div>
-        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">
-          📅 من ${p.start_date} إلى ${p.end_date}
-        </div>
-      </label>
-    `).join('');
+
+          <div style="font-size:0.88rem; color:var(--text-secondary); margin-top:10px; padding-right:28px; line-height:1.7;">
+            <div>📅 <strong>الوصول (البداية):</strong> ${formatArabicDate(p.start_date)} <span class="text-muted">(${p.arrival_time_desc || '12:00 ظهراً'})</span></div>
+            <div>🚪 <strong>المغادرة (النهاية):</strong> ${formatArabicDate(depDate)} <span class="text-muted">(${p.departure_time_desc || 'قبل 9:00 صباحاً'})</span></div>
+            <div>🌙 <strong>المدة:</strong> <span style="color:var(--primary-gold); font-weight:700;">${nightsCount} ليالي (${totalDays} أيام)</span></div>
+          </div>
+        </label>
+      `;
+    }).join('');
 
     content.innerHTML = `
       <div class="form-group">
-        <label class="form-label required">الفترات المتاحة للحجز:</label>
-        <div style="max-height:220px; overflow-y:auto;">
-          ${periodsHtml || '<p class="text-muted">لا توجد فترات متاحة حالياً.</p>'}
+        <label class="form-label required">اختاري فترة الخلوة المناسبة لكِ:</label>
+        <div style="max-height:280px; overflow-y:auto; padding-right:4px;">
+          ${periodsHtml || '<p class="text-muted" style="text-align:center; padding:20px;">لا توجد فترات متاحة حالياً. يرجى التواصل مع إدارة الدير.</p>'}
         </div>
       </div>
 
-      <div class="form-group" style="margin-top:15px; background:rgba(0,0,0,0.2); padding:12px; border-radius:8px;">
+      <div class="form-group" style="margin-top:15px; background:rgba(0,0,0,0.25); padding:14px; border-radius:12px; border:1px solid var(--border-subtle);">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" id="w-exc-check" ${d.has_interval_exception ? 'checked' : ''} onchange="toggleExceptionReason(this)" />
-          <span style="font-size:0.9rem;">طلب استثناء من الفاصل الزمني (3 أشهر بين الخلوات)</span>
+          <input type="checkbox" id="w-exc-check" ${d.has_interval_exception ? 'checked' : ''} onchange="toggleExceptionReason(this)" style="accent-color:var(--primary-gold); width:16px; height:16px;" />
+          <span style="font-size:0.92rem; font-weight:600;">طلب استثناء من الفاصل الزمني (أقل من 3 أشهر منذ آخر خلوة)</span>
         </label>
         <div id="w-exc-reason-box" style="display:${d.has_interval_exception ? 'block' : 'none'}; margin-top:10px;">
-          <textarea id="w-exc-reason" class="form-control" rows="2" placeholder="اكتبي سبب طلب الاستثناء لعرضه على الأم المسؤولة...">${d.interval_exception_reason || ''}</textarea>
+          <textarea id="w-exc-reason" class="form-control" rows="2" placeholder="اكتبي سبب طلب الاستثناء بالتفصيل لعرضه على الأم المسؤولة...">${d.interval_exception_reason || ''}</textarea>
         </div>
       </div>
     `;

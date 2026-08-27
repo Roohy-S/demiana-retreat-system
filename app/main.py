@@ -63,7 +63,7 @@ async def get_index_page(request: Request):
   <meta name="apple-mobile-web-app-title" content="بيت الخلوة">
   <title>بيت الخلوة – دير القديسة دميانة – ببراري بلقاس</title>
   <meta name="description" content="النظام الإلكتروني الرسمي لحجز وإدارة بيت الخلوة بدير القديسة دميانة ببراري بلقاس">
-  <link rel="stylesheet" href="/static/css/style.css?v=2.2">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.3">
   <link rel="icon" href="/static/images/cross.png" type="image/png">
   <link rel="apple-touch-icon" href="/static/images/cross.png">
 </head>
@@ -98,11 +98,11 @@ async def get_index_page(request: Request):
   <div id="toast-container" style="position:fixed; bottom:20px; right:20px; z-index:9999;"></div>
 
   <!-- Scripts -->
-  <script src="/static/js/app.js?v=2.2"></script>
-  <script src="/static/js/landing.js?v=2.2"></script>
-  <script src="/static/js/registration.js?v=2.2"></script>
-  <script src="/static/js/guest_dashboard.js?v=2.2"></script>
-  <script src="/static/js/admin_dashboard.js?v=2.2"></script>
+  <script src="/static/js/app.js?v=2.3"></script>
+  <script src="/static/js/landing.js?v=2.3"></script>
+  <script src="/static/js/registration.js?v=2.3"></script>
+  <script src="/static/js/guest_dashboard.js?v=2.3"></script>
+  <script src="/static/js/admin_dashboard.js?v=2.3"></script>
 </body>
 </html>
 """

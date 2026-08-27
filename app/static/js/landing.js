@@ -217,31 +217,36 @@ async function loadLandingPeriods() {
       return;
     }
 
-    container.innerHTML = periods.map(p => `
-      <div class="glass-card ${p.is_full ? '' : 'gold-glow'}" style="display:flex; flex-direction:column; justify-content:space-between;">
-        <div>
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-            <h3 style="font-size:1.15rem; color:var(--text-primary);">${p.period_name}</h3>
-            <span class="badge ${p.is_full ? 'badge-waiting_list' : 'badge-approved'}">
-              ${p.is_full ? 'مكتملة (انتظار)' : 'متاحة للحجز'}
-            </span>
-          </div>
+    container.innerHTML = periods.map(p => {
+      const isFull = p.status === 'FULL' || p.remaining_spots <= 0;
+      const nightsCount = p.nights_count || 3;
+      const totalDays = nightsCount + 1;
+      return `
+        <div class="glass-card ${isFull ? '' : 'gold-glow'}" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;">
+              <h3 style="font-size:1.15rem; color:var(--text-primary);">${p.period_name}</h3>
+              <span class="badge ${isFull ? 'badge-waiting_list' : 'badge-approved'}">
+                ${isFull ? 'مكتملة (انتظار)' : 'متاحة للحجز'}
+              </span>
+            </div>
 
-          <div style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:15px; line-height:1.8;">
-            <div>📅 <strong>تاريخ البدء:</strong> ${p.start_date}</div>
-            <div>🏁 <strong>المغادرة:</strong> ${p.departure_date} (${p.departure_time_desc})</div>
-            <div>🌙 <strong>المدة:</strong> ${p.nights_count} ليالٍ</div>
-            <div>👥 <strong>السعة:</strong> ${p.capacity} مكان 
-              <span style="color:var(--primary-gold); font-weight:700;">(متبقي: ${p.remaining_spots})</span>
+            <div style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:18px; line-height:1.8;">
+              <div>📅 <strong>الوصول (البداية):</strong> ${formatArabicDate(p.start_date)}</div>
+              <div>🚪 <strong>المغادرة (النهاية):</strong> ${formatArabicDate(p.departure_date)} <span class="text-muted">(${p.departure_time_desc || 'قبل 9:00 ص'})</span></div>
+              <div>🌙 <strong>المدة:</strong> <span style="color:var(--primary-gold); font-weight:700;">${nightsCount} ليالي (${totalDays} أيام)</span></div>
+              <div>🛏️ <strong>السعة الكلية:</strong> ${p.capacity} مكان 
+                <span style="color:var(--primary-gold); font-weight:800; margin-right:4px;">(متبقي: ${p.remaining_spots} سرير)</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <button class="btn btn-primary" style="width:100%;" onclick="navigate('register_wizard', { selectedPeriodId: '${p.id}' })">
-          ${p.is_full ? 'طلب الانضمام لقائمة الانتظار' : 'احجزي الآن'}
-        </button>
-      </div>
-    `).join('');
+          <button class="btn btn-primary" style="width:100%;" onclick="navigate('register_wizard', { selectedPeriodId: '${p.id}' })">
+            ${isFull ? 'طلب الانضمام لقائمة الانتظار' : '✝ احجزي في هذه الفترة'}
+          </button>
+        </div>
+      `;
+    }).join('');
 
   } catch (err) {
     container.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#F43F5E;">تعذر تحميل فترات الخلوة.</div>`;

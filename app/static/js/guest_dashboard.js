@@ -147,16 +147,20 @@ async function openNewBookingModal() {
 
     container.innerHTML = periods.map((p, idx) => {
       const isFull = p.status === 'FULL' || p.remaining_spots <= 0;
+      const nightsCount = p.nights_count || 3;
+      const totalDays = nightsCount + 1;
       return `
-        <label class="glass-card" style="display:flex; align-items:center; gap:12px; padding:12px; cursor:pointer; margin-bottom:6px;">
-          <input type="radio" name="quick-period-radio" value="${p.id}" ${idx === 0 ? 'checked' : ''} required />
+        <label class="glass-card" style="display:flex; align-items:flex-start; gap:12px; padding:14px; cursor:pointer; margin-bottom:8px; border:1px solid var(--border-subtle);">
+          <input type="radio" name="quick-period-radio" value="${p.id}" ${idx === 0 ? 'checked' : ''} style="margin-top:4px; accent-color:var(--primary-gold); width:18px; height:18px;" required />
           <div style="flex:1;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong style="color:var(--text-light); font-size:0.95rem;">${p.period_name}</strong>
-              <span class="badge badge-${p.status.toLowerCase()}">${isFull ? 'مكتملة (انتظار)' : `متاح ${p.remaining_spots} مكان`}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <strong style="color:var(--text-primary); font-size:1rem;">${p.period_name}</strong>
+              <span class="badge badge-${p.status.toLowerCase()}">${isFull ? 'مكتملة (انتظار)' : `متاح ${p.remaining_spots} سرير`}</span>
             </div>
-            <div class="text-muted" style="font-size:0.8rem; margin-top:3px;">
-              📅 البدء: ${p.start_date} (${p.arrival_time_desc}) ➔ المغادرة: ${p.departure_date} (${p.departure_time_desc})
+            <div class="text-secondary" style="font-size:0.86rem; margin-top:6px; line-height:1.7;">
+              <div>📅 <strong>الوصول (البداية):</strong> ${formatArabicDate(p.start_date)} <span class="text-muted">(${p.arrival_time_desc || '12:00 ظ'})</span></div>
+              <div>🚪 <strong>المغادرة (النهاية):</strong> ${formatArabicDate(p.departure_date)} <span class="text-muted">(${p.departure_time_desc || 'قبل 9:00 ص'})</span></div>
+              <div>🌙 <strong>المدة:</strong> <span style="color:var(--primary-gold); font-weight:700;">${nightsCount} ليالي (${totalDays} أيام)</span></div>
             </div>
           </div>
         </label>
@@ -217,13 +221,15 @@ async function loadGuestDashboardData() {
           <div style="font-size:3rem; margin-bottom:10px;">📅</div>
           <h3 style="color:var(--text-gold); margin-bottom:8px;">لا يوجد حجز خلوة نشط حالياً</h3>
           <p class="text-muted" style="margin-bottom:20px;">يمكنكِ اختيار إحدى الفترات المفتوحة والتقدم بطلب خلوة جديد.</p>
-          <button class="btn btn-primary" onclick="navigate('register_wizard')">تقديم طلب خلوة جديد</button>
+          <button class="btn btn-primary" onclick="openNewBookingModal()">+ تقديم طلب خلوة جديد</button>
         </div>
       `;
       historyList.innerHTML = `<p class="text-muted">لا توجد حجوزات سابقة مسجلة.</p>`;
     } else {
       const latest = bookings[0];
       const p = latest.period || {};
+      const nightsCount = p.nights_count || 3;
+      const totalDays = nightsCount + 1;
       
       // Status badge and explanation text
       let statusBadge = '';
@@ -276,17 +282,20 @@ async function loadGuestDashboardData() {
         </div>
 
         <div class="grid grid-cols-3" style="gap:14px; margin-bottom:20px; font-size:0.9rem; line-height:1.8;">
-          <div style="background:rgba(15,23,42,0.4); padding:12px; border-radius:8px;">
-            <div>📅 <strong>الوصول:</strong> ${p.start_date || '-'}</div>
-            <small class="text-muted">(${p.arrival_time_desc || '12:00 ظهراً'})</small>
+          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+            <div>📅 <strong>الوصول (البداية):</strong></div>
+            <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.start_date)}</div>
+            <small class="text-muted">${p.arrival_time_desc || '12:00 ظهراً'}</small>
           </div>
-          <div style="background:rgba(15,23,42,0.4); padding:12px; border-radius:8px;">
-            <div>🏁 <strong>المغادرة:</strong> ${p.departure_date || '-'}</div>
-            <small class="text-muted">(${p.departure_time_desc || 'قبل 9:00 صباحاً'})</small>
+          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+            <div>🚪 <strong>المغادرة (النهاية):</strong></div>
+            <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.departure_date)}</div>
+            <small class="text-muted">${p.departure_time_desc || 'قبل 9:00 صباحاً'}</small>
           </div>
-          <div style="background:rgba(15,23,42,0.4); padding:12px; border-radius:8px;">
-            <div>🌙 <strong>المدة:</strong> ${p.nights_count || 3} ليالٍ</div>
-            <small class="text-muted">اليوم الرابع يوم المغادرة</small>
+          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+            <div>🌙 <strong>مدة الإقامة:</strong></div>
+            <div style="color:var(--primary-gold); font-weight:800; font-size:1rem;">${nightsCount} ليالي (${totalDays} أيام)</div>
+            <small class="text-muted">الخلوة الرسمية</small>
           </div>
         </div>
 
@@ -312,7 +321,7 @@ async function loadGuestDashboardData() {
             <span class="text-muted" style="margin-right:8px; font-size:0.85rem;">- ${b.period ? b.period.period_name : ''}</span>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:0.8rem; color:var(--text-muted);">${b.created_at ? b.created_at.slice(0,10) : ''}</span>
+            <span style="font-size:0.8rem; color:var(--text-muted);">${b.created_at ? formatShortDate(b.created_at.slice(0,10)) : ''}</span>
             <span class="badge badge-${b.status.toLowerCase()}">${b.status}</span>
           </div>
         </div>
