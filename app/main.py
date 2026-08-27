@@ -56,11 +56,16 @@ async def get_index_page(request: Request):
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0F17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="بيت الخلوة">
   <title>بيت الخلوة – دير القديسة دميانة – ببراري بلقاس</title>
   <meta name="description" content="النظام الإلكتروني الرسمي لحجز وإدارة بيت الخلوة بدير القديسة دميانة ببراري بلقاس">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="icon" href="/static/images/cross.png" type="image/png">
+  <link rel="apple-touch-icon" href="/static/images/cross.png">
 </head>
 <body>
   <!-- Monastic Background Overlays -->
