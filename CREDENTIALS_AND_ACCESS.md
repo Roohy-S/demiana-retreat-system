@@ -102,3 +102,13 @@ python seed_data.py
 ```powershell
 python -m pytest
 ```
+
+---
+
+## 7. 📧 إعدادات خادم البريد الإلكتروني الحقيقي (Production Gmail SMTP)
+
+- **مزود الخدمة:** `Google Gmail SMTP (TLS 587)`
+- **حساب الإرسال (Sender Email):** `roohhamza25@gmail.com`
+- **اسم المرسل:** `بيت الخلوة – دير القديسة دميانة ببراري بلقاس`
+- **كلمة مرور التطبيق (App Password):** `bhmizaqnmdkjyoem`
+- **حالة التحقق الحقيقي:** مفعلة وشغالة 100% وتصل مباشرة إلى صندوق الوارد (Inbox).
