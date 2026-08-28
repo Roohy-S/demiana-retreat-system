@@ -1,5 +1,5 @@
 from app.schemas.auth import Token, TokenData, UserRegister, UserLogin, UserPasswordChange, UserOut
-from app.schemas.profile import ProfileUpdate, ProfileOut, GuardianOut, ConfessionFatherOut, DocumentOut
+from app.schemas.profile import ProfileUpdate, ProfileOut, ProfileBriefOut, GuardianOut, ConfessionFatherOut, DocumentOut
 from app.schemas.period import PeriodCreate, PeriodUpdate, PeriodOut, WaitlistOut
 from app.schemas.booking import (
     BookingSubmit, BookingStatusUpdate, BookingTransfer, ExtensionRequestCreate,
@@ -19,6 +19,7 @@ __all__ = [
     "UserOut",
     "ProfileUpdate",
     "ProfileOut",
+    "ProfileBriefOut",
     "GuardianOut",
     "ConfessionFatherOut",
     "DocumentOut",

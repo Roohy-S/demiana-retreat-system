@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -18,6 +19,8 @@ from app.schemas.booking import (
     ExtensionRequestDecision, ExceptionRequestDecision
 )
 from app.schemas.profile import ProfileOut
+from app.schemas.admin_notes import AdministrativeNoteOut, ViolationOut
+from app.schemas.notification import CommunicationLogOut
 from app.core.security import require_staff, require_mother_superior
 from app.core.booking_engine import approve_booking_action, reject_booking_action
 from app.core.audit import record_audit_log
@@ -146,11 +149,25 @@ async def search_and_filter_bookings(
     governorate: Optional[str] = None,
     has_warning: Optional[bool] = None,
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 100,
     current_user: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Booking).join(Profile, Booking.profile_id == Profile.id)
+    stmt = (
+        select(Booking)
+        .join(Profile, Booking.profile_id == Profile.id, isouter=True)
+        .options(
+            selectinload(Booking.profile).options(
+                selectinload(Profile.guardians),
+                selectinload(Profile.confession_fathers),
+                selectinload(Profile.documents),
+                selectinload(Profile.violations)
+            ),
+            selectinload(Booking.period),
+            selectinload(Booking.history),
+            selectinload(Booking.extension_requests)
+        )
+    )
     
     if q:
         search_pattern = f"%{q}%"
@@ -175,7 +192,8 @@ async def search_and_filter_bookings(
 
     stmt = stmt.order_by(Booking.created_at.desc()).offset(skip).limit(limit)
     res = await db.execute(stmt)
-    return res.scalars().all()
+    bookings = res.scalars().all()
+    return [BookingOut.model_validate(b) for b in bookings]
 
 @router.get("/applicant/{profile_id}")
 async def get_applicant_full_dossier(
@@ -183,14 +201,33 @@ async def get_applicant_full_dossier(
     current_user: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt_prof = select(Profile).where(Profile.id == profile_id)
+    stmt_prof = (
+        select(Profile)
+        .where(Profile.id == profile_id)
+        .options(
+            selectinload(Profile.guardians),
+            selectinload(Profile.confession_fathers),
+            selectinload(Profile.documents),
+            selectinload(Profile.violations)
+        )
+    )
     res_prof = await db.execute(stmt_prof)
     profile = res_prof.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="ملف المتقدمة غير موجود")
 
     # Bookings History
-    stmt_b = select(Booking).where(Booking.profile_id == profile.id).order_by(Booking.created_at.desc())
+    stmt_b = (
+        select(Booking)
+        .where(Booking.profile_id == profile.id)
+        .options(
+            selectinload(Booking.profile),
+            selectinload(Booking.period),
+            selectinload(Booking.history),
+            selectinload(Booking.extension_requests)
+        )
+        .order_by(Booking.created_at.desc())
+    )
     bookings = (await db.execute(stmt_b)).scalars().all()
 
     # Notes (Confidential)
@@ -208,9 +245,10 @@ async def get_applicant_full_dossier(
     comm_logs = (await db.execute(stmt_c)).scalars().all()
 
     # Audit Trail
+    target_ids = [profile.id] + [b.id for b in bookings]
     stmt_a = select(AuditLog).where(
         AuditLog.target_entity.in_(["PROFILE", "BOOKING"]),
-        AuditLog.target_entity_id.in_([profile.id] + [b.id for b in bookings])
+        AuditLog.target_entity_id.in_(target_ids)
     ).order_by(AuditLog.created_at.desc()).limit(30)
     audit_trails = (await db.execute(stmt_a)).scalars().all()
 
@@ -218,10 +256,20 @@ async def get_applicant_full_dossier(
         "profile": ProfileOut.model_validate(profile),
         "bookings_count": len(bookings),
         "bookings": [BookingOut.model_validate(b) for b in bookings],
-        "notes": notes,
-        "violations": violations,
-        "communication_logs": comm_logs,
-        "audit_trails": audit_trails
+        "notes": [AdministrativeNoteOut.model_validate(n) for n in notes] if notes else [],
+        "violations": [ViolationOut.model_validate(v) for v in violations] if violations else [],
+        "communication_logs": [CommunicationLogOut.model_validate(c) for c in comm_logs] if comm_logs else [],
+        "audit_trails": [
+            {
+                "id": a.id,
+                "action": a.action,
+                "target_entity": a.target_entity,
+                "user_name": getattr(a, 'user_name', a.user_email_cache or 'النظام'),
+                "user_role": getattr(a, 'user_role', 'مسؤول'),
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "details": getattr(a, 'details', a.details_json or '')
+            } for a in audit_trails
+        ]
     }
 
 @router.post("/bookings/{booking_id}/approve", response_model=BookingOut)

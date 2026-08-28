@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, R
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
@@ -21,12 +22,20 @@ async def get_my_profile(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Profile).where(Profile.user_id == current_user.id)
+    stmt = (
+        select(Profile)
+        .where(Profile.user_id == current_user.id)
+        .options(
+            selectinload(Profile.guardians),
+            selectinload(Profile.confession_fathers),
+            selectinload(Profile.documents)
+        )
+    )
     res = await db.execute(stmt)
     profile = res.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="الملف الشخصي غير موجود")
-    return profile
+    return ProfileOut.model_validate(profile)
 
 @router.put("/me", response_model=ProfileOut)
 async def update_my_profile(
@@ -34,7 +43,15 @@ async def update_my_profile(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Profile).where(Profile.user_id == current_user.id)
+    stmt = (
+        select(Profile)
+        .where(Profile.user_id == current_user.id)
+        .options(
+            selectinload(Profile.guardians),
+            selectinload(Profile.confession_fathers),
+            selectinload(Profile.documents)
+        )
+    )
     res = await db.execute(stmt)
     profile = res.scalar_one_or_none()
     if not profile:
@@ -59,8 +76,18 @@ async def update_my_profile(
             setattr(profile, field, val)
 
     await db.commit()
-    await db.refresh(profile)
-    return profile
+    
+    stmt_refetch = (
+        select(Profile)
+        .where(Profile.id == profile.id)
+        .options(
+            selectinload(Profile.guardians),
+            selectinload(Profile.confession_fathers),
+            selectinload(Profile.documents)
+        )
+    )
+    profile = (await db.execute(stmt_refetch)).scalar_one()
+    return ProfileOut.model_validate(profile)
 
 @router.post("/upload-document", response_model=DocumentOut)
 async def upload_document(
@@ -107,7 +134,7 @@ async def upload_document(
     db.add(doc_record)
     await db.commit()
     await db.refresh(doc_record)
-    return doc_record
+    return DocumentOut.model_validate(doc_record)
 
 @router.get("/document/{doc_id}")
 async def get_secure_document(

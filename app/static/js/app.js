@@ -6,10 +6,17 @@ const AppState = {
   token: localStorage.getItem('demiana_token') || null,
   user: JSON.parse(localStorage.getItem('demiana_user') || 'null'),
   currentView: 'landing',
-  privacyMode: true,
+  privacyMode: false,
   notifications: [],
   pendingVerificationEmail: null
 };
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
 
 // API Client Helper
 async function apiCall(endpoint, options = {}) {
@@ -220,6 +227,26 @@ function formatShortDate(dateStr) {
     return `${dayName} ${padD}-${padM}-${y}`;
   } catch (e) {
     return dateStr;
+  }
+}
+
+function calculateAge(birthDateStr) {
+  if (!birthDateStr) return '-';
+  try {
+    const parts = birthDateStr.split('T')[0].split('-');
+    if (parts.length !== 3) return '-';
+    const birthYear = parseInt(parts[0], 10);
+    const birthMonth = parseInt(parts[1], 10) - 1;
+    const birthDay = parseInt(parts[2], 10);
+    const today = new Date();
+    let age = today.getFullYear() - birthYear;
+    const m = today.getMonth() - birthMonth;
+    if (m < 0 || (m === 0 && today.getDate() < birthDay)) {
+      age--;
+    }
+    return age >= 0 ? age : '-';
+  } catch (e) {
+    return '-';
   }
 }
 

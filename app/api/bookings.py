@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -39,7 +40,7 @@ async def submit_booking(
         has_interval_exception=payload.has_interval_exception,
         interval_exception_reason=payload.interval_exception_reason
     )
-    return booking
+    return BookingOut.model_validate(booking)
 
 @router.get("/my", response_model=List[BookingOut])
 async def get_my_bookings(
@@ -52,9 +53,20 @@ async def get_my_bookings(
     if not profile:
         return []
 
-    stmt = select(Booking).where(Booking.profile_id == profile.id).order_by(Booking.created_at.desc())
+    stmt = (
+        select(Booking)
+        .where(Booking.profile_id == profile.id)
+        .options(
+            selectinload(Booking.profile),
+            selectinload(Booking.period),
+            selectinload(Booking.history),
+            selectinload(Booking.extension_requests)
+        )
+        .order_by(Booking.created_at.desc())
+    )
     res = await db.execute(stmt)
-    return res.scalars().all()
+    bookings = res.scalars().all()
+    return [BookingOut.model_validate(b) for b in bookings]
 
 @router.get("/{booking_id}", response_model=BookingOut)
 async def get_booking_details(
@@ -62,7 +74,16 @@ async def get_booking_details(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Booking).where(Booking.id == booking_id)
+    stmt = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .options(
+            selectinload(Booking.profile),
+            selectinload(Booking.period),
+            selectinload(Booking.history),
+            selectinload(Booking.extension_requests)
+        )
+    )
     res = await db.execute(stmt)
     booking = res.scalar_one_or_none()
     if not booking:
@@ -76,7 +97,7 @@ async def get_booking_details(
         if not my_prof or my_prof.id != booking.profile_id:
             raise HTTPException(status_code=403, detail="ليس لديك صلاحية لعرض هذا الحجز")
 
-    return booking
+    return BookingOut.model_validate(booking)
 
 @router.post("/{booking_id}/cancel", response_model=BookingOut)
 async def cancel_booking(

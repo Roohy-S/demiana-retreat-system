@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from app.schemas.profile import ProfileOut
+from app.schemas.profile import ProfileBriefOut, ProfileOut
 from app.schemas.period import PeriodOut
 
 class BookingSubmit(BaseModel):
@@ -71,13 +71,17 @@ class BookingOut(BaseModel):
     profile_id: str
     period_id: str
     status: str
-    has_interval_exception: bool
+    has_interval_exception: bool = False
     interval_exception_reason: Optional[str] = None
-    interval_exception_status: str
-    agreed_to_rules: bool
+    interval_exception_status: str = "NONE"
+    agreed_to_rules: bool = True
     created_at: datetime
     updated_at: datetime
-    profile: Optional[ProfileOut] = None
+    profile: Optional[ProfileBriefOut] = None
     period: Optional[PeriodOut] = None
-    history: List[StatusHistoryOut] = []
-    extension_requests: List[ExtensionRequestOut] = []
+    history: Optional[List[StatusHistoryOut]] = []
+    extension_requests: Optional[List[ExtensionRequestOut]] = []
+
+StatusHistoryOut.model_rebuild()
+ExtensionRequestOut.model_rebuild()
+BookingOut.model_rebuild()

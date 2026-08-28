@@ -43,3 +43,15 @@ class AuditLog(Base):
     user_agent = Column(String(255), nullable=True)
     details_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+    @property
+    def user_name(self) -> str:
+        return self.user_email_cache or "النظام"
+
+    @property
+    def user_role(self) -> str:
+        return "مسؤول"
+
+    @property
+    def details(self) -> str:
+        return self.details_json or ""

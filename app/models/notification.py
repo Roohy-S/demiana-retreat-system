@@ -46,3 +46,15 @@ class CommunicationLog(Base):
     message_content = Column(Text, nullable=False)
     delivery_status = Column(String(50), default="SENT", nullable=False)
     sent_at = Column(DateTime, default=utc_now, nullable=False)
+
+    @property
+    def created_at(self) -> datetime:
+        return self.sent_at
+
+    @property
+    def recipient_phone_snapshot(self) -> str:
+        return self.recipient_phone_or_email
+
+    @property
+    def template_type(self) -> str:
+        return self.message_template_name or "CUSTOM"

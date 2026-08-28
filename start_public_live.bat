@@ -1,21 +1,23 @@
 @echo off
-chcp 65001 > nul
-echo ==============================================================================
-echo  نظام بيت الخلوة بدير القديسة دميانة ببراري بلقاس - جاري التشغيل المباشر...
-echo ==============================================================================
+setlocal
+chcp 65001 >nul
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
 cd /d "%~dp0"
+title Saint Demiana Monastery - Retreat System Live
 
-echo [*] جاري تشغيل خادم FastAPI في الخلفية...
-start /b python -m uvicorn app.main:app --port 8000 --host 127.0.0.1
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" run_live.py
+) else (
+    python run_live.py
+)
 
-timeout /t 3 /nobreak > nul
-
-echo [*] جاري إنشاء رابط تجريبي عام عبر Cloudflare السحابي...
-echo.
-echo ==============================================================================
-echo  انسخ الرابط الذي سينتهي بـ (.trycloudflare.com) وافتحه في المتصفح أو على الموبايل:
-echo ==============================================================================
-echo.
-
-cloudflared.exe tunnel --url http://127.0.0.1:8000
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ====================================================================
+    echo [!] An error occurred while running the application.
+    echo ====================================================================
+)
 pause
+
+

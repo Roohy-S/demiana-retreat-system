@@ -10,8 +10,20 @@ let adminState = {
   activeFilterPeriodId: '',
   activeFilterStatus: '',
   searchQuery: '',
-  privacyMode: true
+  privacyMode: false,
+  bookingsViewMode: 'cards'
 };
+
+function togglePrivacyMode() {
+  adminState.privacyMode = !adminState.privacyMode;
+  AppState.privacyMode = adminState.privacyMode;
+  renderAdminDashboard(document.getElementById('main-content'));
+}
+
+function setBookingsViewMode(mode) {
+  adminState.bookingsViewMode = mode;
+  loadAdminBookings();
+}
 
 async function renderAdminDashboard(container) {
   container.innerHTML = `
@@ -395,12 +407,13 @@ async function renderPeriodsTab(container) {
 
 // 3. Bookings Search & Filter Tab
 async function renderBookingsTab(container) {
+  const isCards = adminState.bookingsViewMode === 'cards';
   container.innerHTML = `
     <!-- Search & Filter Controls -->
     <div class="glass-card" style="margin-bottom:20px;">
-      <div class="grid grid-cols-4" style="gap:12px;">
+      <div class="grid grid-cols-4" style="gap:12px; align-items:center;">
         <div class="form-group" style="grid-column: span 2; margin-bottom:0;">
-          <input type="text" id="admin-search-input" class="form-control" placeholder="بحث بالاسم، الهاتف، الكنيسة، الإبراشية، أو كود الحجز..." onkeyup="handleBookingSearch(event)" />
+          <input type="text" id="admin-search-input" class="form-control" placeholder="بحث بالاسم، الهاتف، الرقم القومي، الكنيسة، أو كود الحجز..." onkeyup="handleBookingSearch(event)" />
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <select id="admin-status-filter" class="form-control" onchange="handleBookingFilter()">
@@ -415,16 +428,19 @@ async function renderBookingsTab(container) {
           </select>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-primary" style="flex-grow:1;" onclick="handleBookingFilter()">تصفية</button>
+          <button class="btn btn-primary" style="flex-grow:1;" onclick="handleBookingFilter()">تصفية 🔍</button>
+          <!-- View Switcher -->
+          <div style="display:flex; border:1px solid var(--border-subtle); border-radius:8px; overflow:hidden;">
+            <button id="view-mode-cards-btn" class="btn btn-sm ${isCards ? 'btn-primary' : 'btn-secondary'}" style="border-radius:0; padding:6px 12px;" onclick="setBookingsViewMode('cards')" title="عرض البطاقات الذكية">🎴 بطاقات</button>
+            <button id="view-mode-table-btn" class="btn btn-sm ${!isCards ? 'btn-primary' : 'btn-secondary'}" style="border-radius:0; padding:6px 12px;" onclick="setBookingsViewMode('table')" title="عرض الجدول">📑 جدول</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Bookings Table -->
-    <div class="glass-card">
-      <div id="admin-bookings-table-container">
-        <p class="text-muted">جاري تحميل الحجوزات...</p>
-      </div>
+    <!-- Bookings Container -->
+    <div id="admin-bookings-table-container">
+      <p class="text-muted" style="text-align:center; padding:30px;">جاري تحميل الحجوزات والبيانات...</p>
     </div>
   `;
 
@@ -437,6 +453,7 @@ async function loadAdminBookings(params = {}) {
 
   const q = document.getElementById('admin-search-input')?.value || '';
   const status = document.getElementById('admin-status-filter')?.value || '';
+  const isCards = adminState.bookingsViewMode === 'cards';
 
   try {
     let url = `/admin/bookings?skip=0&limit=100`;
@@ -446,64 +463,266 @@ async function loadAdminBookings(params = {}) {
     const bookings = await apiCall(url);
 
     if (!bookings || bookings.length === 0) {
-      container.innerHTML = `<p class="text-muted" style="text-align:center; padding:20px;">لا توجد نتائج مطابقة لبحثك.</p>`;
+      container.innerHTML = `
+        <div class="glass-card" style="text-align:center; padding:40px;">
+          <p class="text-muted" style="font-size:1.1rem; margin-bottom:10px;">لا توجد طلبات حجوزات مطابقة للبحث أو التصفية الحالية.</p>
+        </div>
+      `;
       return;
     }
 
-    container.innerHTML = `
-      <div class="table-responsive">
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>كود الحجز</th>
-              <th>الاسم</th>
-              <th>المحافظة</th>
-              <th>الكنيسة</th>
-              <th>رقم الهاتف</th>
-              <th>الفترة</th>
-              <th>الحالة</th>
-              <th>تنبيه</th>
-              <th>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bookings.map(b => {
-              const p = b.profile || {};
-              const phoneDisplay = maskPhone(p.phone_number);
-              return `
-                <tr>
-                  <td><strong>${b.booking_reference}</strong></td>
-                  <td>
-                    <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" style="color:var(--primary-gold); font-weight:700; text-decoration:none;">
-                      ${p.full_name || '-'}
+    const statusBadgeMap = {
+      'under_review': 'badge-under_review',
+      'submitted': 'badge-under_review',
+      'approved': 'badge-approved',
+      'rejected': 'badge-rejected',
+      'waiting_list': 'badge-waiting_list',
+      'checked_in': 'badge-checked_in',
+      'completed': 'badge-completed',
+      'cancelled': 'badge-cancelled',
+      'extension_requested': 'badge-warning'
+    };
+    const statusArabicMap = {
+      'UNDER_REVIEW': 'قيد المراجعة',
+      'SUBMITTED': 'مقدم',
+      'APPROVED': 'مقبول ومؤكد',
+      'REJECTED': 'مرفوض',
+      'WAITING_LIST': 'قائمة الانتظار',
+      'CHECKED_IN': 'حاضرة بالدير',
+      'COMPLETED': 'مكتمل',
+      'CANCELLED': 'معتذرة',
+      'EXTENSION_REQUESTED': 'طلب تمديد'
+    };
+
+    if (isCards) {
+      // 🎴 Cards View (High-end responsive cards for mobile & desktop)
+      container.innerHTML = `
+        <div class="grid grid-cols-2" style="gap:16px;">
+          ${bookings.map(b => {
+            const p = b.profile || {};
+            const guardians = p.guardians || [];
+            const confessionFathers = p.confession_fathers || [];
+            const violations = p.violations || [];
+            const personalPhone = p.phone_number || '-';
+            const companionPhone = p.companion_phone || '';
+            const statusKey = (b.status || '').toLowerCase();
+            const periodTitle = b.period ? (b.period.period_name || '-') : '-';
+            const badgeClass = statusBadgeMap[statusKey] || 'badge-secondary';
+            const statusLabel = statusArabicMap[b.status] || b.status || '-';
+            const hasViolations = p.has_active_warning || p.is_blocked_from_booking || violations.length > 0;
+
+            const g = guardians.length > 0 ? guardians[0] : null;
+            const f = confessionFathers.length > 0 ? confessionFathers[0] : null;
+
+            return `
+              <div class="glass-card" style="padding:18px; border-radius:14px; position:relative; ${hasViolations ? 'border-color:rgba(244,63,94,0.45); background:rgba(30,20,30,0.5);' : 'border-color:rgba(212,175,55,0.25);'}">
+                <!-- Card Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; border-bottom:1px solid var(--border-subtle); padding-bottom:10px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:var(--primary-gold); font-size:1.05rem; font-weight:800; font-family:monospace; letter-spacing:0.5px;">${b.booking_reference || '-'}</span>
+                    <span class="badge ${badgeClass}" style="font-size:0.78rem;">${statusLabel}</span>
+                  </div>
+                  <div>
+                    ${hasViolations ? `
+                      <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" class="badge badge-rejected" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;">
+                        ⚠️ ${violations.length > 0 ? violations.length + ' مخالفة مسجلة' : 'تنبيه سابق'}
+                      </a>
+                    ` : `
+                      <span class="badge badge-approved" style="font-size:0.75rem;">✓ سليم (${p.total_retreats_count || 0} خلوات)</span>
+                    `}
+                  </div>
+                </div>
+
+                <!-- Applicant Core Info -->
+                <div style="margin-bottom:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;">
+                    <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" style="color:var(--text-primary); font-size:1.15rem; font-weight:800; text-decoration:none;">
+                      👤 ${p.full_name || '-'}
                     </a>
-                  </td>
-                  <td>${p.governorate || '-'}</td>
-                  <td>${p.church || '-'}</td>
-                  <td><span class="${adminState.privacyMode ? 'privacy-masked' : ''}">${phoneDisplay}</span></td>
-                  <td>${b.period ? b.period.period_name : '-'}</td>
-                  <td><span class="badge badge-${b.status.toLowerCase()}">${b.status}</span></td>
-                  <td>
-                    ${p.has_active_warning ? '<span class="badge badge-rejected" title="توجد ملاحظات أو مخالفات سابقة">⚠️ تنبيه</span>' : '<span style="color:#10B981;">سليم</span>'}
-                  </td>
-                  <td>
-                    <div style="display:flex; gap:6px;">
-                      ${b.status === 'UNDER_REVIEW' || b.status === 'SUBMITTED' ? `
-                        <button class="btn btn-sm btn-success" onclick="approveBookingAdmin('${b.id}')">قبول ✓</button>
-                        <button class="btn btn-sm btn-danger" onclick="rejectBookingAdmin('${b.id}')">رفض ✕</button>
-                      ` : ''}
-                      <button class="btn btn-sm btn-secondary" onclick="openCandidateDossier('${p.id}')">الملف</button>
-                    </div>
-                  </td>
+                    <span style="font-size:0.85rem; color:var(--text-muted);">
+                      ${p.birth_date ? `العمر: <strong style="color:var(--text-primary);">${calculateAge(p.birth_date)} سنة</strong>` : ''}
+                      ${p.is_minor ? '<span class="badge badge-warning" style="margin-right:4px; font-size:0.7rem;">قاصر</span>' : ''}
+                    </span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:12px; margin-top:4px; font-size:0.85rem;">
+                    <span style="color:var(--primary-gold); font-family:monospace; font-weight:700;">🆔 الرقم القومي: ${p.national_id_number || 'غير مسجل'}</span>
+                  </div>
+                  <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">
+                    ⛪ ${p.church || 'الكنيسة غير محددة'} <span class="text-muted">(${p.governorate || ''} ${p.diocese ? ' - ' + p.diocese : ''})</span>
+                  </div>
+                </div>
+
+                <!-- 3 Information Detail Boxes -->
+                <div class="grid grid-cols-3" style="gap:10px; margin-bottom:14px; background:rgba(15,23,42,0.6); padding:12px; border-radius:10px; border:1px solid var(--border-subtle);">
+                  <!-- Box 1: الرقم الشخصي -->
+                  <div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:3px;">📱 الرقم الشخصي:</div>
+                    <a href="tel:${personalPhone}" style="color:var(--primary-gold); font-weight:800; font-size:0.95rem; text-decoration:none; display:inline-block; direction:ltr;">
+                      ${personalPhone}
+                    </a>
+                    ${companionPhone ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">🏠 تليفون البيت: <strong style="color:var(--text-primary); direction:ltr; display:inline-block;">${companionPhone}</strong></div>` : ''}
+                  </div>
+
+                  <!-- Box 2: ولي الأمر / المسؤول -->
+                  <div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:3px;">👨‍👩‍👧 ولي الأمر / المسؤول:</div>
+                    ${g ? `
+                      <div style="font-weight:700; color:var(--text-primary); font-size:0.88rem;">${g.full_name || '-'} <span class="badge badge-approved" style="padding:0px 4px; font-size:0.68rem;">${g.guardian_type || 'ولي أمر'}</span></div>
+                      <a href="tel:${g.phone_number}" style="color:var(--primary-gold); font-weight:700; font-size:0.9rem; text-decoration:none; direction:ltr; display:inline-block; margin-top:2px;">
+                        ${g.phone_number || '-'}
+                      </a>
+                    ` : (p.companion_name || p.companion_phone ? `
+                      <div style="font-weight:700; color:var(--text-primary); font-size:0.88rem;">${p.companion_name || 'المسؤول'}</div>
+                      <a href="tel:${p.companion_phone}" style="color:var(--primary-gold); font-weight:700; font-size:0.9rem; text-decoration:none; direction:ltr; display:inline-block; margin-top:2px;">
+                        ${p.companion_phone || '-'}
+                      </a>
+                    ` : '<span class="text-muted" style="font-size:0.8rem;">بالغة (بدون ولي أمر)</span>')}
+                  </div>
+
+                  <!-- Box 3: أب الاعتراف -->
+                  <div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:3px;">⛪ أب الاعتراف:</div>
+                    ${f ? `
+                      <div style="font-weight:700; color:#38BDF8; font-size:0.88rem;">${f.father_name || '-'}</div>
+                      <a href="tel:${f.father_phone}" style="color:#38BDF8; font-weight:700; font-size:0.9rem; text-decoration:none; direction:ltr; display:inline-block; margin-top:2px;">
+                        ${f.father_phone || '-'}
+                      </a>
+                      <div style="font-size:0.72rem; color:var(--text-muted);">${f.church_name || ''}</div>
+                    ` : '<span class="text-muted" style="font-size:0.8rem;">لم يسجل</span>'}
+                  </div>
+                </div>
+
+                <!-- Period Details -->
+                <div style="margin-bottom:14px; font-size:0.84rem; color:var(--text-secondary); background:rgba(212,175,55,0.06); padding:8px 12px; border-radius:8px; border:1px solid rgba(212,175,55,0.15);">
+                  📅 <strong>فترة الخلوة المطلوبة:</strong> ${periodTitle}
+                </div>
+
+                <!-- Actions Footer -->
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; pt-2; border-top:1px solid var(--border-subtle); padding-top:12px;">
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    ${b.status === 'UNDER_REVIEW' || b.status === 'SUBMITTED' ? `
+                      <button class="btn btn-sm btn-success" style="font-weight:700; padding:6px 14px;" onclick="approveBookingAdmin('${b.id}')">✓ قبول الحجز</button>
+                      <button class="btn btn-sm btn-danger" style="font-weight:700; padding:6px 14px;" onclick="rejectBookingAdmin('${b.id}')">✕ رفض الحجز</button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-outline-gold" style="padding:6px 14px;" onclick="openCandidateDossier('${p.id}')">👁 فحص الملف الشامل</button>
+                  </div>
+                  <div>
+                    <a class="btn btn-sm btn-secondary" style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:4px;" href="https://wa.me/20${personalPhone.replace(/^0+/, '')}" target="_blank">
+                      📲 واتساب
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } else {
+      // 📑 Table View (Spacious horizontal table with full phones & clean widths)
+      container.innerHTML = `
+        <div class="glass-card">
+          <div class="table-responsive">
+            <table class="custom-table" style="font-size:0.86rem; min-width:1100px;">
+              <thead>
+                <tr>
+                  <th style="white-space:nowrap;">كود الحجز</th>
+                  <th style="min-width:170px;">المتقدمة والرقم القومي</th>
+                  <th style="min-width:140px; white-space:nowrap;">الرقم الشخصي</th>
+                  <th style="min-width:150px;">المحافظة والكنيسة</th>
+                  <th style="min-width:160px;">ولي الأمر / المسؤول</th>
+                  <th style="min-width:160px;">أب الاعتراف</th>
+                  <th style="white-space:nowrap;">فترة الخلوة</th>
+                  <th style="white-space:nowrap;">الحالة</th>
+                  <th style="white-space:nowrap;">السوابق والمشاكل</th>
+                  <th style="min-width:170px; white-space:nowrap;">القرار والإجراءات</th>
                 </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+              </thead>
+              <tbody>
+                ${bookings.map(b => {
+                  const p = b.profile || {};
+                  const guardians = p.guardians || [];
+                  const confessionFathers = p.confession_fathers || [];
+                  const violations = p.violations || [];
+                  const personalPhone = p.phone_number || '-';
+                  const companionPhone = p.companion_phone || '';
+                  const statusKey = (b.status || '').toLowerCase();
+                  const periodTitle = b.period ? (b.period.period_name || '-') : '-';
+                  const badgeClass = statusBadgeMap[statusKey] || 'badge-secondary';
+                  const statusLabel = statusArabicMap[b.status] || b.status || '-';
+                  const hasViolations = p.has_active_warning || p.is_blocked_from_booking || violations.length > 0;
+
+                  const g = guardians.length > 0 ? guardians[0] : null;
+                  const f = confessionFathers.length > 0 ? confessionFathers[0] : null;
+
+                  return `
+                    <tr style="${hasViolations ? 'background:rgba(244,63,94,0.05);' : ''}">
+                      <td style="white-space:nowrap;"><strong style="color:var(--primary-gold); font-family:monospace;">${b.booking_reference || '-'}</strong></td>
+                      <td>
+                        <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" style="color:var(--text-primary); font-weight:700; text-decoration:none; font-size:0.92rem;">
+                          ${p.full_name || '-'}
+                        </a>
+                        <div style="font-size:0.75rem; color:var(--primary-gold); font-family:monospace; margin-top:2px;">
+                          🆔 ${p.national_id_number || 'غير مسجل'} ${p.birth_date ? `(${calculateAge(p.birth_date)} سنة)` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <div style="direction:ltr; text-align:right;"><a href="tel:${personalPhone}" style="color:var(--primary-gold); font-weight:700; text-decoration:none;">${personalPhone}</a></div>
+                        ${companionPhone ? `<div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">🏠 <span style="direction:ltr;">${companionPhone}</span></div>` : ''}
+                      </td>
+                      <td>
+                        <div>${p.church || '-'}</div>
+                        <small class="text-muted">${p.governorate || ''} ${p.diocese ? ' - ' + p.diocese : ''}</small>
+                      </td>
+                      <td>
+                        ${g ? `
+                          <div style="font-weight:600; color:var(--text-primary);">${g.full_name || '-'} <span class="badge badge-approved" style="padding:0px 3px; font-size:0.68rem;">${g.guardian_type || 'ولي أمر'}</span></div>
+                          <div style="direction:ltr; text-align:right;"><a href="tel:${g.phone_number}" style="color:var(--primary-gold); font-size:0.84rem; text-decoration:none;">${g.phone_number}</a></div>
+                        ` : (p.companion_name || p.companion_phone ? `
+                          <div style="font-weight:600;">${p.companion_name || 'المسؤول'}</div>
+                          <div style="direction:ltr; text-align:right;"><a href="tel:${p.companion_phone}" style="color:var(--primary-gold); font-size:0.84rem; text-decoration:none;">${p.companion_phone}</a></div>
+                        ` : '<span class="text-muted">-</span>')}
+                      </td>
+                      <td>
+                        ${f ? `
+                          <div style="font-weight:600; color:#38BDF8;">${f.father_name || '-'}</div>
+                          <div style="direction:ltr; text-align:right;"><a href="tel:${f.father_phone}" style="color:#38BDF8; font-size:0.84rem; text-decoration:none;">${f.father_phone}</a></div>
+                          <div style="font-size:0.72rem; color:var(--text-muted);">${f.church_name || ''}</div>
+                        ` : '<span class="text-muted">-</span>'}
+                      </td>
+                      <td style="white-space:nowrap;"><span style="font-size:0.82rem;">${periodTitle}</span></td>
+                      <td style="white-space:nowrap;"><span class="badge ${badgeClass}">${statusLabel}</span></td>
+                      <td style="white-space:nowrap;">
+                        ${hasViolations ? `
+                          <a href="javascript:void(0)" onclick="openCandidateDossier('${p.id}')" class="badge badge-rejected" style="text-decoration:none; display:inline-block;" title="اضغطي لعرض تفاصيل المخالفات السابقة">
+                            ⚠️ ${violations.length > 0 ? violations.length + ' مخالفة' : 'تنبيه سابق'}
+                          </a>
+                        ` : `
+                          <span style="color:#10B981; font-size:0.82rem; font-weight:600;">
+                            ✓ سليم (${p.total_retreats_count || 0} خلوة)
+                          </span>
+                        `}
+                      </td>
+                      <td style="white-space:nowrap;">
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                          ${b.status === 'UNDER_REVIEW' || b.status === 'SUBMITTED' ? `
+                            <button class="btn btn-sm btn-success" style="padding:4px 8px; font-size:0.8rem;" onclick="approveBookingAdmin('${b.id}')">قبول ✓</button>
+                            <button class="btn btn-sm btn-danger" style="padding:4px 8px; font-size:0.8rem;" onclick="rejectBookingAdmin('${b.id}')">رفض ✕</button>
+                          ` : ''}
+                          ${p.id ? `<button class="btn btn-sm btn-secondary" style="padding:4px 8px; font-size:0.8rem;" onclick="openCandidateDossier('${p.id}')">👁 الملف</button>` : ''}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
   } catch (err) {
-    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الحجوزات.</p>`;
+    console.error('Error loading admin bookings:', err);
+    container.innerHTML = `<p style="color:#F43F5E;">فشل تحميل الحجوزات: ${escapeHtml(err.message || 'حدث خطأ في الاتصال')}</p>`;
   }
 }
 
@@ -523,36 +742,145 @@ async function openCandidateDossier(profileId) {
   const body = document.getElementById('dossier-modal-body');
   const title = document.getElementById('dossier-candidate-name');
 
-  body.innerHTML = `<p class="text-muted">جاري تحميل الملف الكامل للمتقدمة...</p>`;
+  body.innerHTML = `<p class="text-muted" style="text-align:center; padding:30px;">جاري تحميل الملف الكامل للمتقدمة وجميع البيانات المسجلة...</p>`;
   openModal('candidate-dossier-modal');
 
   try {
     const dossier = await apiCall(`/admin/applicant/${profileId}`);
     adminState.selectedCandidate = dossier;
     const p = dossier.profile;
+    const guardians = p.guardians || [];
+    const confessionFathers = p.confession_fathers || [];
+    const documents = p.documents || [];
+    const violations = dossier.violations || [];
+    const notes = dossier.notes || [];
+    const bookings = dossier.bookings || [];
+    const latestBooking = bookings.length > 0 ? bookings[0] : null;
 
-    title.innerText = `ملف المتقدمة: ${p.full_name}`;
+    title.innerText = `ملف المتقدمة: ${p.full_name || '-'}`;
+
+    // Has warning / violations check
+    const hasWarningsOrViolations = p.has_active_warning || p.is_blocked_from_booking || violations.length > 0 || notes.some(n => n.severity === 'CRITICAL' || n.severity === 'HIGH');
 
     body.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; border-bottom:1px solid var(--border-subtle); padding-bottom:14px;">
-        <div>
-          <div style="font-size:1.2rem; font-weight:800; color:var(--text-primary);">${p.full_name}</div>
-          <div class="text-muted">${p.church} - ${p.diocese} (${p.governorate})</div>
-          <div>رقم الهاتف: <strong>${p.phone_number}</strong> | تاريخ الميلاد: <strong>${p.birth_date}</strong></div>
+      <!-- Warning / Safety Status Banner -->
+      ${hasWarningsOrViolations ? `
+        <div style="background:rgba(244,63,94,0.12); border:2px solid #F43F5E; border-radius:10px; padding:14px 18px; margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; color:#FDA4AF; font-weight:800; font-size:1.05rem;">
+              <span style="font-size:1.3rem;">⚠️</span>
+              <span>تنبيه للأم المسؤولة: توجد ملاحظات أو مخالفات سابقة مسجلة على هذه المتقدمة!</span>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span class="badge badge-rejected" style="font-size:0.85rem;">المخالفات: ${violations.length}</span>
+              <span class="badge badge-warning" style="font-size:0.85rem;">الملاحظات: ${notes.length}</span>
+            </div>
+          </div>
+          <p style="font-size:0.88rem; color:#FECDD3; margin-top:8px; margin-bottom:0; line-height:1.6;">
+            يرجى مراجعة تبويب (المخالفات والملاحظات) بالأسفل للوقوف على تفاصيل الأسباب السابقة، وللأم المسؤولة كامل الصلاحية لمنحها فرصة وقبول الحجز أو الاعتذار عنه.
+          </p>
         </div>
-        <div>
-          <button class="btn btn-sm btn-outline-gold" onclick="openWhatsAppModal('${p.id}', '${p.full_name}')">
-            📲 مراسلة WhatsApp
-          </button>
+      ` : `
+        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:10px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px; color:#34D399; font-weight:700; font-size:0.92rem;">
+            <span>✓</span> السجل نظيف - لا توجد أي مخالفات أو تنبيهات سابقة مسجلة.
+          </div>
+          <span class="badge badge-approved" style="font-size:0.8rem;">سليم وموثق</span>
         </div>
+      `}
+
+      <!-- Quick Action & Booking Status Bar for Mother Superior -->
+      ${latestBooking ? `
+        <div class="glass-card gold-glow" style="padding:14px 18px; margin-bottom:20px; background:rgba(212,175,55,0.06); border:1px solid var(--primary-gold); border-radius:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="font-size:0.85rem; color:var(--text-muted);">الحجز الحالي / الأحدث:</div>
+              <strong style="color:var(--text-gold); font-size:1.05rem;">${latestBooking.period ? latestBooking.period.period_name : 'فترة الخلوة'}</strong>
+              <span class="text-muted" style="margin-right:8px; font-size:0.85rem;">(كود: ${latestBooking.booking_reference})</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="badge badge-${(latestBooking.status || '').toLowerCase()}" style="font-size:0.85rem;">الحالة: ${latestBooking.status}</span>
+              ${(latestBooking.status === 'UNDER_REVIEW' || latestBooking.status === 'SUBMITTED') ? `
+                <button class="btn btn-sm btn-success" onclick="approveBookingFromDossier('${latestBooking.id}', '${p.id}')">✓ قبول وتأكيد الحجز</button>
+                <button class="btn btn-sm btn-danger" onclick="rejectBookingFromDossier('${latestBooking.id}', '${p.id}')">✕ رفض الحجز</button>
+              ` : ''}
+              <button class="btn btn-sm btn-outline-gold" onclick="openWhatsAppModal('${p.id}', '${p.full_name}')">
+                📲 مراسلة WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Detailed 4-Grid Information Architecture -->
+      <div class="grid grid-cols-2" style="gap:16px; margin-bottom:20px;">
+        
+        <!-- Card 1: Personal & Contact Details -->
+        <div style="background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border:1px solid var(--border-subtle);">
+          <h4 style="color:var(--primary-gold); font-size:1rem; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+            <span>👤</span> البيانات الشخصية والاتصال
+          </h4>
+          <div style="font-size:0.88rem; line-height:2;">
+            <div><strong>الاسم رباعي:</strong> <span style="color:var(--text-primary); font-weight:700;">${p.full_name || '-'}</span></div>
+            <div><strong>الرقم القومي:</strong> <span style="color:var(--text-gold); font-family:monospace; font-size:0.95rem; letter-spacing:1px;">${p.national_id_number || 'غير مسجل'}</span></div>
+            <div><strong>تاريخ الميلاد والعمر:</strong> ${p.birth_date ? formatShortDate(p.birth_date) : '-'} <span class="badge badge-secondary" style="font-size:0.75rem;">${calculateAge(p.birth_date)} سنة</span></div>
+            <div><strong>الموبايل الشخصي:</strong> <a href="tel:${p.phone_number}" style="color:var(--primary-gold); font-weight:700;">${p.phone_number || '-'}</a></div>
+            <div><strong>تليفون المنزل / المرافق:</strong> <a href="tel:${p.companion_phone || ''}" style="color:var(--text-secondary);">${p.companion_phone || '-'}</a></div>
+            <div><strong>المؤهل / الوظيفة:</strong> ${p.education_or_job || '-'}</div>
+            <div><strong>المحافظة:</strong> ${p.governorate || '-'} | <strong>الإيبارشية:</strong> ${p.diocese || '-'}</div>
+            <div><strong>الكنيسة:</strong> ${p.church || '-'}</div>
+            <div><strong>الفئة:</strong> ${p.is_minor ? '<span class="badge badge-warning" style="font-size:0.75rem;">قاصر (أقل من 21 سنة)</span>' : '<span class="badge badge-secondary" style="font-size:0.75rem;">بالغة</span>'}</div>
+          </div>
+        </div>
+
+        <!-- Card 2: Guardian & Confession Father Details -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          
+          <!-- Guardian Box -->
+          <div style="background:rgba(15,23,42,0.6); padding:14px; border-radius:10px; border:1px solid var(--border-subtle); flex-grow:1;">
+            <h4 style="color:var(--primary-gold); font-size:1rem; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+              <span>👨‍👩‍👧</span> بيانات ولي الأمر / المسؤول عنها
+            </h4>
+            ${guardians.length > 0 ? guardians.map(g => `
+              <div style="background:rgba(15,23,42,0.4); padding:10px 12px; border-radius:8px; margin-bottom:6px; border-right:3px solid var(--primary-gold); font-size:0.88rem; line-height:1.8;">
+                <div><strong>صلة القرابة:</strong> <span class="badge badge-approved" style="font-size:0.75rem;">${g.guardian_type || 'ولي أمر'}</span></div>
+                <div><strong>اسم ولي الأمر:</strong> <span style="color:var(--text-primary); font-weight:700;">${g.full_name || '-'}</span></div>
+                <div><strong>تليفون ولي الأمر:</strong> <a href="tel:${g.phone_number}" style="color:var(--primary-gold); font-weight:700;">${g.phone_number || '-'}</a></div>
+              </div>
+            `).join('') : `
+              <div style="font-size:0.88rem; line-height:1.8;">
+                ${p.companion_name || p.companion_phone ? `
+                  <div><strong>اسم المرافق/المسؤول:</strong> ${p.companion_name || '-'}</div>
+                  <div><strong>تليفون المرافق/المسؤول:</strong> <a href="tel:${p.companion_phone}">${p.companion_phone || '-'}</a></div>
+                ` : '<p class="text-muted" style="margin:0;">لم يتم تسجيل بيانات ولي أمر مستقلة (مكتملة الأهلية).</p>'}
+              </div>
+            `}
+          </div>
+
+          <!-- Confession Father Box -->
+          <div style="background:rgba(15,23,42,0.6); padding:14px; border-radius:10px; border:1px solid var(--border-subtle); flex-grow:1;">
+            <h4 style="color:#38BDF8; font-size:1rem; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+              <span>⛪</span> بيانات أب الاعتراف
+            </h4>
+            ${confessionFathers.length > 0 ? confessionFathers.map(f => `
+              <div style="background:rgba(15,23,42,0.4); padding:10px 12px; border-radius:8px; margin-bottom:6px; border-right:3px solid #38BDF8; font-size:0.88rem; line-height:1.8;">
+                <div><strong>اسم أب الاعتراف:</strong> <span style="color:#38BDF8; font-weight:700;">${f.father_name || '-'}</span></div>
+                <div><strong>رقم التليفون:</strong> <a href="tel:${f.father_phone}" style="color:var(--primary-gold); font-weight:700;">${f.father_phone || '-'}</a></div>
+                <div><strong>كنيسة أب الاعتراف:</strong> ${f.church_name || '-'}</div>
+              </div>
+            `).join('') : '<p class="text-muted" style="margin:0; font-size:0.88rem;">لم يتم تسجيل بيانات أب الاعتراف.</p>'}
+          </div>
+
+        </div>
+
       </div>
 
-      <!-- Dossier Tabs -->
+      <!-- Dossier Tabs Header -->
       <div class="tabs-nav" id="dossier-sub-tabs">
-        <button class="tab-btn active" onclick="switchDossierTab('history')">📜 سجل الخلوات (${dossier.bookings_count})</button>
-        <button class="tab-btn" onclick="switchDossierTab('notes')">🔒 الملاحظات السرية (${dossier.notes.length})</button>
-        <button class="tab-btn" onclick="switchDossierTab('violations')">⚠️ المخالفات (${dossier.violations.length})</button>
-        <button class="tab-btn" onclick="switchDossierTab('docs')">📁 المستندات والبطاقة (${p.documents.length})</button>
+        <button class="tab-btn active" onclick="switchDossierTab('docs')">📁 المستندات والبطاقة (${documents.length})</button>
+        <button class="tab-btn" onclick="switchDossierTab('violations')">⚠️ المخالفات السابقة (${violations.length})</button>
+        <button class="tab-btn" onclick="switchDossierTab('notes')">🔒 الملاحظات السرية (${notes.length})</button>
+        <button class="tab-btn" onclick="switchDossierTab('history')">📜 سجل الخلوات السابقة (${bookings.length})</button>
       </div>
 
       <div id="dossier-tab-content" style="margin-top:16px;">
@@ -560,10 +888,23 @@ async function openCandidateDossier(profileId) {
       </div>
     `;
 
-    switchDossierTab('history');
+    switchDossierTab('docs');
   } catch (err) {
-    body.innerHTML = `<p style="color:#F43F5E;">فشل تحميل ملف المتقدمة.</p>`;
+    console.error(err);
+    body.innerHTML = `<p style="color:#F43F5E; text-align:center; padding:20px;">فشل تحميل ملف المتقدمة: ${escapeHtml(err.message || 'حدث خطأ')}</p>`;
   }
+}
+
+async function approveBookingFromDossier(bookingId, profileId) {
+  await approveBookingAdmin(bookingId);
+  openCandidateDossier(profileId);
+  loadAdminBookings();
+}
+
+async function rejectBookingFromDossier(bookingId, profileId) {
+  await rejectBookingAdmin(bookingId);
+  openCandidateDossier(profileId);
+  loadAdminBookings();
 }
 
 function switchDossierTab(tabKey) {
@@ -573,39 +914,87 @@ function switchDossierTab(tabKey) {
   const content = document.getElementById('dossier-tab-content');
   if (!content) return;
 
-  if (tabKey === 'history') {
+  // Highlight active tab
+  document.querySelectorAll('#dossier-sub-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = Array.from(document.querySelectorAll('#dossier-sub-tabs .tab-btn')).find(b => b.getAttribute('onclick')?.includes(`'${tabKey}'`));
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const p = d.profile;
+  const docs = p.documents || [];
+  const violations = d.violations || [];
+  const notes = d.notes || [];
+  const bookings = d.bookings || [];
+
+  if (tabKey === 'docs') {
+    const docTypeArabic = {
+      'NATIONAL_ID_FRONT': 'بطاقة الرقم القومي (الوجه الأمامي)',
+      'NATIONAL_ID_BACK': 'بطاقة الرقم القومي (الوجه الخلفي)',
+      'CONFESSION_LETTER': 'خطاب تزكية أب الاعتراف',
+      'GUARDIAN_APPROVAL': 'موافقة ولي الأمر',
+      'OTHER': 'مستند إضافي'
+    };
+
     content.innerHTML = `
-      <div class="table-responsive">
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>كود الحجز</th>
-              <th>الفترة</th>
-              <th>الحالة</th>
-              <th>تاريخ التقديم</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${d.bookings.map(b => `
-              <tr>
-                <td><strong>${b.booking_reference}</strong></td>
-                <td>${b.period ? b.period.period_name : '-'}</td>
-                <td><span class="badge badge-${b.status.toLowerCase()}">${b.status}</span></td>
-                <td>${b.created_at.slice(0,10)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <div class="grid grid-cols-2" style="gap:16px;">
+        ${docs.length === 0 ? '<p class="text-muted" style="grid-column:span 2; text-align:center; padding:20px;">لم يتم رفع مستندات حتى الآن لهذه المتقدمة.</p>' : docs.map(doc => {
+          const typeLabel = docTypeArabic[doc.doc_type || doc.document_type] || doc.doc_type || 'مستند';
+          const sizeKb = doc.file_size_bytes ? (doc.file_size_bytes / 1024).toFixed(1) : '0';
+          return `
+            <div style="background:rgba(15,23,42,0.5); padding:16px; border-radius:10px; border:1px solid var(--border-subtle); display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <div style="font-weight:700; color:var(--primary-gold); margin-bottom:6px; font-size:1rem;">📄 ${typeLabel}</div>
+                <div class="text-muted" style="font-size:0.82rem; margin-bottom:12px;">${doc.file_name || 'ملف مرفق'} (${sizeKb} KB)</div>
+              </div>
+              <a class="btn btn-sm btn-outline-gold" style="width:100%; text-align:center;" href="/api/v1/profile/document/${doc.id}" target="_blank">
+                👁 استعراض وتدقيق المستند بأمان
+              </a>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } else if (tabKey === 'violations') {
+    content.innerHTML = `
+      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+        <span class="text-muted" style="font-size:0.9rem;">المخالفات أو المشاكل السابقة المسجلة على المتقدمة في الخلوات الماضية:</span>
+        <button class="btn btn-sm btn-danger" onclick="showAddViolationForm('${p.id}')">+ تسجيل مخالفة جديدة</button>
+      </div>
+      <div id="add-violation-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border:1px solid rgba(244,63,94,0.3);">
+        <h4 style="color:#F43F5E; margin-bottom:10px;">تسجيل مخالفة جديدة</h4>
+        <input type="text" id="new-viol-title" class="form-control" placeholder="عنوان المخالفة (مثال: عدم الالتزام بمواعيد الصلوات، إزعاج...)" style="margin-bottom:10px;" />
+        <textarea id="new-viol-desc" class="form-control" rows="3" placeholder="تفاصيل المخالفة وتاريخ حدوثها..."></textarea>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="btn btn-sm btn-danger" onclick="saveViolation('${p.id}')">✓ حفظ المخالفة</button>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('add-violation-form-area').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+
+      <div>
+        ${violations.length === 0 ? `
+          <div style="text-align:center; padding:30px; background:rgba(15,23,42,0.4); border-radius:10px;">
+            <div style="font-size:2rem; margin-bottom:6px;">🕊️</div>
+            <p style="color:#34D399; font-weight:600;">لا توجد أي مخالفات مسجلة على هذه المتقدمة.</p>
+          </div>
+        ` : violations.map(v => `
+          <div style="background:rgba(244,63,94,0.1); padding:14px 18px; border-radius:10px; margin-bottom:10px; border-right:4px solid #F43F5E;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <strong style="color:#FDA4AF; font-size:1rem;">⚠️ ${v.violation_title}</strong>
+              <small class="text-muted">${v.occurred_at ? v.occurred_at.slice(0,10) : ''}</small>
+            </div>
+            <p style="font-size:0.92rem; color:var(--text-secondary); margin-bottom:0; line-height:1.7;">${v.violation_description}</p>
+          </div>
+        `).join('')}
       </div>
     `;
   } else if (tabKey === 'notes') {
     content.innerHTML = `
-      <div style="margin-bottom:16px; display:flex; justify-content:flex-end;">
-        <button class="btn btn-sm btn-primary" onclick="showAddNoteForm('${d.profile.id}')">+ تسجيل ملاحظة إدارية خاصة</button>
+      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+        <span class="text-muted" style="font-size:0.9rem;">الملاحظات السرية الخاصة بالأم المسؤولة:</span>
+        <button class="btn btn-sm btn-primary" onclick="showAddNoteForm('${p.id}')">+ تسجيل ملاحظة إدارية سرية</button>
       </div>
-      <div id="add-note-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px;">
+      <div id="add-note-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border:1px solid var(--border-subtle);">
         <h4 style="color:var(--primary-gold); margin-bottom:10px;">إضافة ملاحظة إدارية سرية جديدة</h4>
-        <textarea id="new-note-content" class="form-control" rows="3" placeholder="اكتبي الملاحظة هنا..."></textarea>
+        <textarea id="new-note-content" class="form-control" rows="3" placeholder="اكتبي الملاحظة السرية هنا..."></textarea>
         <div class="grid grid-cols-2" style="margin-top:10px;">
           <div>
             <label class="form-label">مستوى الأهمية / الخطورة</label>
@@ -618,68 +1007,59 @@ function switchDossierTab(tabKey) {
           <div>
             <label class="form-label">التوصية المستقبلية</label>
             <select id="new-note-rec" class="form-control">
-              <option value="NONE">بدون توصية</option>
+              <option value="NONE">بدون توصية خاصة</option>
               <option value="BAN_BOOKING">منع الحجز مستقبلاً</option>
-              <option value="CONDITIONAL_APPROVAL">حجز بشروط</option>
+              <option value="CONDITIONAL_APPROVAL">حجز بشروط ومتابعة</option>
             </select>
           </div>
         </div>
         <div style="margin-top:12px; display:flex; gap:10px;">
-          <button class="btn btn-sm btn-primary" onclick="saveAdminNote('${d.profile.id}')">حفظ الملاحظة</button>
+          <button class="btn btn-sm btn-primary" onclick="saveAdminNote('${p.id}')">✓ حفظ الملاحظة</button>
           <button class="btn btn-sm btn-secondary" onclick="document.getElementById('add-note-form-area').style.display='none'">إلغاء</button>
         </div>
       </div>
 
       <div>
-        ${d.notes.length === 0 ? '<p class="text-muted">لا توجد ملاحظات إدارية مسجلة لهذه المتقدمة.</p>' : d.notes.map(n => `
-          <div style="background:rgba(15,23,42,0.5); padding:12px 16px; border-radius:8px; margin-bottom:10px; border-right:4px solid ${n.severity==='CRITICAL'?'#F43F5E':n.severity==='HIGH'?'#F59E0B':'#38BDF8'};">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <strong style="color:var(--text-primary);">${n.note_type} (${n.severity})</strong>
-              <small class="text-muted">${n.created_at.slice(0,16).replace('T', ' ')}</small>
+        ${notes.length === 0 ? '<p class="text-muted" style="text-align:center; padding:20px;">لا توجد ملاحظات إدارية سرية مسجلة.</p>' : notes.map(n => {
+          const borderColor = n.severity==='CRITICAL'?'#F43F5E':n.severity==='HIGH'?'#F59E0B':'#38BDF8';
+          return `
+            <div style="background:rgba(15,23,42,0.5); padding:14px 18px; border-radius:10px; margin-bottom:10px; border-right:4px solid ${borderColor};">
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <strong style="color:var(--text-primary); font-size:0.95rem;">${n.note_type || 'ملاحظة إدارية'} (${n.severity})</strong>
+                <small class="text-muted">${n.created_at ? n.created_at.slice(0,16).replace('T', ' ') : ''}</small>
+              </div>
+              <p style="font-size:0.92rem; color:var(--text-secondary); margin-bottom:4px; line-height:1.7;">${n.content}</p>
+              ${n.recommendation && n.recommendation !== 'NONE' ? `<div style="font-size:0.82rem; color:#F59E0B; font-weight:700;">التوصية: ${n.recommendation}</div>` : ''}
             </div>
-            <p style="font-size:0.92rem; color:var(--text-secondary);">${n.content}</p>
-            ${n.recommendation !== 'NONE' ? `<div style="font-size:0.8rem; color:#F59E0B; margin-top:4px;">التوصية: ${n.recommendation}</div>` : ''}
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
-  } else if (tabKey === 'violations') {
+  } else if (tabKey === 'history') {
     content.innerHTML = `
-      <div style="margin-bottom:16px; display:flex; justify-content:flex-end;">
-        <button class="btn btn-sm btn-danger" onclick="showAddViolationForm('${d.profile.id}')">+ تسجيل مخالفة</button>
-      </div>
-      <div id="add-violation-form-area" style="display:none; margin-bottom:20px; background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border:1px solid rgba(244,63,94,0.3);">
-        <h4 style="color:#F43F5E; margin-bottom:10px;">تسجيل مخالفة جديدة</h4>
-        <input type="text" id="new-viol-title" class="form-control" placeholder="عنوان المخالفة" style="margin-bottom:10px;" />
-        <textarea id="new-viol-desc" class="form-control" rows="3" placeholder="تفاصيل المخالفة..."></textarea>
-        <div style="margin-top:12px; display:flex; gap:10px;">
-          <button class="btn btn-sm btn-danger" onclick="saveViolation('${d.profile.id}')">حفظ المخالفة</button>
-          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('add-violation-form-area').style.display='none'">إلغاء</button>
-        </div>
-      </div>
-
-      <div>
-        ${d.violations.length === 0 ? '<p class="text-muted">لا توجد مخالفات مسجلة.</p>' : d.violations.map(v => `
-          <div style="background:rgba(244,63,94,0.1); padding:12px 16px; border-radius:8px; margin-bottom:10px; border-right:4px solid #F43F5E;">
-            <div style="font-weight:700; color:#FDA4AF; margin-bottom:4px;">${v.violation_title}</div>
-            <p style="font-size:0.9rem; color:var(--text-secondary);">${v.violation_description}</p>
-            <small class="text-muted">${v.occurred_at}</small>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  } else if (tabKey === 'docs') {
-    content.innerHTML = `
-      <div class="grid grid-cols-2" style="gap:16px;">
-        ${d.profile.documents.length === 0 ? '<p class="text-muted">لم يتم رفع مستندات حتى الآن.</p>' : d.profile.documents.map(doc => `
-          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:8px; border:1px solid var(--border-subtle);">
-            <div style="font-weight:700; color:var(--primary-gold); margin-bottom:6px;">${doc.doc_type}</div>
-            <div class="text-muted" style="font-size:0.8rem; margin-bottom:10px;">${doc.file_name} (${(doc.file_size_bytes/1024).toFixed(1)} KB)</div>
-            <a class="btn btn-sm btn-outline-gold" href="/api/v1/profile/document/${doc.id}" target="_blank">
-              👁 استعراض المستند بأمان (مسجل بالـ Audit)
-            </a>
-          </div>
-        `).join('')}
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>كود الحجز</th>
+              <th>الفترة</th>
+              <th>الحالة</th>
+              <th>تاريخ التقديم</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bookings.length === 0 ? `
+              <tr><td colspan="4" class="text-muted" style="text-align:center;">لا توجد حجوزات سابقة مسجلة.</td></tr>
+            ` : bookings.map(b => `
+              <tr>
+                <td><strong>${b.booking_reference}</strong></td>
+                <td>${b.period ? b.period.period_name : '-'}</td>
+                <td><span class="badge badge-${(b.status || '').toLowerCase()}">${b.status}</span></td>
+                <td>${b.created_at ? formatShortDate(b.created_at.slice(0,10)) : '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
@@ -737,7 +1117,7 @@ async function saveViolation(profId) {
     showToast('تم تسجيل المخالفة بنجاح', 'success');
     openCandidateDossier(profId);
   } catch (err) {
-    showToast(err.message || 'فشل تسجيل المخالفة', 'danger');
+    showToast(err.message || 'فشل حفظ المخالفة', 'danger');
   }
 }
 

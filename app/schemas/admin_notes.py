@@ -36,9 +36,14 @@ class ViolationOut(BaseModel):
     id: str
     profile_id: str
     booking_id: Optional[str] = None
-    title: str
-    description: str
-    severity: str
-    recorded_by_user_id: str
+    violation_title: Optional[str] = None
+    violation_description: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    action_taken: Optional[str] = None
+    is_resolved: Optional[bool] = False
+    occurred_at: Optional[date] = None
+    severity: Optional[str] = "MEDIUM"
+    recorded_by_user_id: Optional[str] = None
     recorded_by_name_cache: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None

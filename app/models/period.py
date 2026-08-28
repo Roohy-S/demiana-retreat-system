@@ -53,6 +53,10 @@ class RetreatPeriod(Base):
     def is_full(self) -> bool:
         return self.approved_count >= self.capacity
 
+    @property
+    def special_period_notes(self) -> Optional[str]:
+        return self.admin_notes
+
 
 class WaitlistStatus:
     WAITING = "WAITING"

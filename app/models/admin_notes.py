@@ -64,6 +64,14 @@ class Violation(Base):
 
     profile = relationship("Profile", back_populates="violations")
 
+    @property
+    def title(self) -> str:
+        return self.violation_title
+
+    @property
+    def description(self) -> str:
+        return self.violation_description
+
 
 class Restriction(Base):
     __tablename__ = "restrictions"

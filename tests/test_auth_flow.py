@@ -36,6 +36,31 @@ async def test_forgot_and_reset_password_workflow():
                 church="مارجرجس"
             )
             session.add(test_prof)
+            await session.flush()
+
+            # Add identity document to test serialization
+            from app.models.profile import IdentityDocument, Guardian, ConfessionFather
+            doc = IdentityDocument(
+                profile_id=test_prof.id,
+                doc_type="NATIONAL_ID_FRONT",
+                file_path="/tmp/nid_front.jpg",
+                file_name="nid_front.jpg",
+                file_size_bytes=1024,
+                mime_type="image/jpeg"
+            )
+            guardian = Guardian(
+                profile_id=test_prof.id,
+                guardian_type="أب",
+                full_name="فايز حبيب",
+                phone_number="01099998888"
+            )
+            father = ConfessionFather(
+                profile_id=test_prof.id,
+                father_name="أبونا بيشوي",
+                father_phone="01288887777",
+                church_name="كنيسة مارجرجس"
+            )
+            session.add_all([doc, guardian, father])
             await session.commit()
 
         # 2. Request forgot password using Phone Number
@@ -87,3 +112,21 @@ async def test_forgot_and_reset_password_workflow():
         })
         assert res_login_nid.status_code == 200
         assert "access_token" in res_login_nid.json()
+        user_token = res_login_nid.json()["access_token"]
+
+        # 7. Verify /profile/me returns profile without lazy load errors
+        res_prof = await client.get("/api/v1/profile/me", headers={"Authorization": f"Bearer {user_token}"})
+        assert res_prof.status_code == 200
+        prof_data = res_prof.json()
+        assert prof_data["full_name"] == "ماريا فايز حبيب"
+        assert len(prof_data["documents"]) == 1
+        assert len(prof_data["guardians"]) == 1
+        assert len(prof_data["confession_fathers"]) == 1
+        assert prof_data["documents"][0]["doc_type"] == "NATIONAL_ID_FRONT"
+        assert prof_data["guardians"][0]["full_name"] == "فايز حبيب"
+        assert prof_data["confession_fathers"][0]["father_name"] == "أبونا بيشوي"
+
+        # 8. Verify /bookings/my returns list of bookings
+        res_my_b = await client.get("/api/v1/bookings/my", headers={"Authorization": f"Bearer {user_token}"})
+        assert res_my_b.status_code == 200
+        assert isinstance(res_my_b.json(), list)

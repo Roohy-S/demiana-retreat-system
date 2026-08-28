@@ -30,10 +30,17 @@ class CommunicationLogOut(BaseModel):
     id: str
     booking_id: Optional[str] = None
     profile_id: str
-    sender_user_id: str
-    channel: str
+    sender_user_id: Optional[str] = None
+    channel: Optional[str] = "WHATSAPP"
     template_type: Optional[str] = None
-    recipient_phone_snapshot: str
-    message_content: str
-    delivery_status: str
-    created_at: datetime
+    message_template_name: Optional[str] = None
+    recipient_phone_snapshot: Optional[str] = None
+    recipient_phone_or_email: Optional[str] = None
+    message_content: Optional[str] = ""
+    delivery_status: Optional[str] = "SENT"
+    sent_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+NotificationOut.model_rebuild()
+CommunicationDispatch.model_rebuild()
+CommunicationLogOut.model_rebuild()

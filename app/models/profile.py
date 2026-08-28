@@ -79,9 +79,22 @@ class IdentityDocument(Base):
     doc_type = Column(String(50), nullable=False)  # NATIONAL_ID_FRONT, NATIONAL_ID_BACK, CONFESSION_LETTER, OTHER
     file_path = Column(String(500), nullable=False)
     file_name = Column(String(255), nullable=False)
-    file_size_bytes = Column(Integer, nullable=False)
-    mime_type = Column(String(100), nullable=False)
+    file_size_bytes = Column(Integer, default=0, nullable=False)
+    mime_type = Column(String(100), default="application/octet-stream", nullable=False)
     uploaded_at = Column(DateTime, default=utc_now, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
 
     profile = relationship("Profile", back_populates="documents")
+
+    @property
+    def document_type(self) -> str:
+        return self.doc_type
+
+    @property
+    def created_at(self) -> datetime:
+        return self.uploaded_at
+
+    @property
+    def is_verified(self) -> bool:
+        return not self.is_archived
+

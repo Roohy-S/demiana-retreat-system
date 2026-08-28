@@ -14,6 +14,14 @@ import app.models # Ensure all models are loaded
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure upload and data directories exist
+    upload_path = Path(settings.UPLOAD_DIR)
+    upload_path.mkdir(parents=True, exist_ok=True)
+    if "sqlite" in settings.DATABASE_URL:
+        db_path_str = settings.DATABASE_URL.split("///")[-1]
+        if db_path_str and not db_path_str.startswith(":memory:"):
+            Path(db_path_str).parent.mkdir(parents=True, exist_ok=True)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
@@ -63,7 +71,7 @@ async def get_index_page(request: Request):
   <meta name="apple-mobile-web-app-title" content="بيت الخلوة">
   <title>بيت الخلوة – دير القديسة دميانة – ببراري بلقاس</title>
   <meta name="description" content="النظام الإلكتروني الرسمي لحجز وإدارة بيت الخلوة بدير القديسة دميانة ببراري بلقاس">
-  <link rel="stylesheet" href="/static/css/style.css?v=2.3">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.8">
   <link rel="icon" href="/static/images/cross.png" type="image/png">
   <link rel="apple-touch-icon" href="/static/images/cross.png">
 </head>
@@ -98,11 +106,11 @@ async def get_index_page(request: Request):
   <div id="toast-container" style="position:fixed; bottom:20px; right:20px; z-index:9999;"></div>
 
   <!-- Scripts -->
-  <script src="/static/js/app.js?v=2.3"></script>
-  <script src="/static/js/landing.js?v=2.3"></script>
-  <script src="/static/js/registration.js?v=2.3"></script>
-  <script src="/static/js/guest_dashboard.js?v=2.3"></script>
-  <script src="/static/js/admin_dashboard.js?v=2.3"></script>
+  <script src="/static/js/app.js?v=2.8"></script>
+  <script src="/static/js/landing.js?v=2.8"></script>
+  <script src="/static/js/registration.js?v=2.8"></script>
+  <script src="/static/js/guest_dashboard.js?v=2.8"></script>
+  <script src="/static/js/admin_dashboard.js?v=2.8"></script>
 </body>
 </html>
 """

@@ -209,148 +209,176 @@ async function handleQuickBookingSubmit(event) {
 }
 
 async function loadGuestDashboardData() {
-  // Load My Bookings
+  const activeCard = document.getElementById('guest-active-booking-card');
+  const historyList = document.getElementById('guest-bookings-history-list');
+  const profCard = document.getElementById('guest-profile-card');
+
+  // 1. Load My Bookings
   try {
     const bookings = await apiCall('/bookings/my');
-    const activeCard = document.getElementById('guest-active-booking-card');
-    const historyList = document.getElementById('guest-bookings-history-list');
 
     if (!bookings || bookings.length === 0) {
-      activeCard.innerHTML = `
-        <div style="text-align:center; padding:30px 20px;">
-          <div style="font-size:3rem; margin-bottom:10px;">📅</div>
-          <h3 style="color:var(--text-gold); margin-bottom:8px;">لا يوجد حجز خلوة نشط حالياً</h3>
-          <p class="text-muted" style="margin-bottom:20px;">يمكنكِ اختيار إحدى الفترات المفتوحة والتقدم بطلب خلوة جديد.</p>
-          <button class="btn btn-primary" onclick="openNewBookingModal()">+ تقديم طلب خلوة جديد</button>
-        </div>
-      `;
-      historyList.innerHTML = `<p class="text-muted">لا توجد حجوزات سابقة مسجلة.</p>`;
+      if (activeCard) {
+        activeCard.innerHTML = `
+          <div style="text-align:center; padding:30px 20px;">
+            <div style="font-size:3rem; margin-bottom:10px;">📅</div>
+            <h3 style="color:var(--text-gold); margin-bottom:8px;">لا يوجد حجز خلوة نشط حالياً</h3>
+            <p class="text-muted" style="margin-bottom:20px;">يمكنكِ اختيار إحدى الفترات المفتوحة والتقدم بطلب خلوة جديد.</p>
+            <button class="btn btn-primary" onclick="openNewBookingModal()">+ تقديم طلب خلوة جديد</button>
+          </div>
+        `;
+      }
+      if (historyList) {
+        historyList.innerHTML = `<p class="text-muted">لا توجد حجوزات سابقة مسجلة.</p>`;
+      }
     } else {
       const latest = bookings[0];
       const p = latest.period || {};
       const nightsCount = p.nights_count || 3;
       const totalDays = nightsCount + 1;
       
-      // Status badge and explanation text
-      let statusBadge = '';
-      let statusDesc = '';
+      const statusBadgeMap = {
+        'under_review': '<span class="badge badge-under_review">قيد المراجعة الإدارية</span>',
+        'submitted': '<span class="badge badge-under_review">قيد المراجعة الإدارية</span>',
+        'approved': '<span class="badge badge-approved">تمت الموافقة على الخلوة</span>',
+        'waiting_list': '<span class="badge badge-waiting_list">في قائمة الانتظار</span>',
+        'checked_in': '<span class="badge badge-checked_in">حاضرة بالدير (Checked In)</span>',
+        'completed': '<span class="badge badge-completed">اكتملت الخلوة</span>',
+        'rejected': '<span class="badge badge-rejected">نعتذر، لم تتم الموافقة</span>',
+        'cancelled': '<span class="badge badge-cancelled">تم إلغاء الحجز</span>',
+        'extension_requested': '<span class="badge badge-warning">طلب تمديد قيد المراجعة</span>',
+        'extension_approved': '<span class="badge badge-approved">تمت الموافقة على التمديد</span>'
+      };
+
+      const statusKey = (latest.status || '').toLowerCase();
+      const statusBadge = statusBadgeMap[statusKey] || `<span class="badge badge-secondary">${latest.status || 'غير محدد'}</span>`;
       
+      let statusDesc = 'تم استلام طلبكِ وجاري متابعته من قبل إدارة بيت الخلوة بالدير.';
       if (latest.status === 'UNDER_REVIEW' || latest.status === 'SUBMITTED') {
-        statusBadge = '<span class="badge badge-under_review">قيد المراجعة الإدارية</span>';
         statusDesc = 'تم استلام طلبكِ وجاري مراجعته من قبل إدارة بيت الخلوة بالدير.';
       } else if (latest.status === 'APPROVED') {
-        statusBadge = '<span class="badge badge-approved">تمت الموافقة على الخلوة</span>';
         statusDesc = 'بركة القديسة دميانة. تمت الموافقة على حجزكِ! يرجى الالتزام بموعد الوصول وإحضار أصل البطاقة وجواب أب الاعتراف.';
       } else if (latest.status === 'WAITING_LIST') {
-        statusBadge = '<span class="badge badge-waiting_list">في قائمة الانتظار</span>';
         statusDesc = 'الفترة مكتملة العدد حالياً. تم وضعكِ في قائمة الانتظار وسيتم إشعاركِ فور توفر أي مكان شاغر.';
       } else if (latest.status === 'CHECKED_IN') {
-        statusBadge = '<span class="badge badge-checked_in">حاضرة بالدير (Checked In)</span>';
         statusDesc = 'خلوة مباركة وممتلئة بالسلام والنعمة.';
       } else if (latest.status === 'COMPLETED') {
-        statusBadge = '<span class="badge badge-completed">اكتملت الخلوة</span>';
         statusDesc = 'تمت فترة الخلوة بسلام ونعمة المسيح.';
       } else if (latest.status === 'REJECTED') {
-        statusBadge = '<span class="badge badge-rejected">نعتذر، لم تتم الموافقة</span>';
         statusDesc = latest.show_rejection_reason_to_user && latest.rejection_reason ? `سبب الاعتذار: ${latest.rejection_reason}` : 'نعتذر عن عدم إمكانية قبول الطلب لهذه الفترة.';
       } else if (latest.status === 'CANCELLED') {
-        statusBadge = '<span class="badge badge-cancelled">تم إلغاء الحجز</span>';
         statusDesc = 'تم تسجيل اعتذاركِ عن موعد الخلوة.';
       } else if (latest.status === 'EXTENSION_REQUESTED') {
-        statusBadge = '<span class="badge badge-extension_requested">طلب تمديد قيد المراجعة</span>';
         statusDesc = 'تم إرسال طلب تمديد مدة الإقامة وهو الآن بانتظار قرار الأم المسؤولة.';
       } else if (latest.status === 'EXTENSION_APPROVED') {
-        statusBadge = '<span class="badge badge-approved">تمت الموافقة على التمديد</span>';
         statusDesc = 'تمت الموافقة على مدة الإقامة الإضافية.';
       }
 
-      activeCard.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
-          <div>
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-              <h2 style="color:var(--primary-gold); font-size:1.35rem;">${p.period_name || 'فترة الخلوة'}</h2>
-              ${statusBadge}
+      if (activeCard) {
+        activeCard.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                <h2 style="color:var(--primary-gold); font-size:1.35rem;">${p.period_name || 'فترة الخلوة'}</h2>
+                ${statusBadge}
+              </div>
+              <div style="font-size:0.9rem; color:var(--text-muted);">
+                كود الحجز المرجعي: <strong style="color:var(--text-primary);">${latest.booking_reference || '-'}</strong>
+              </div>
             </div>
-            <div style="font-size:0.9rem; color:var(--text-muted);">
-              كود الحجز المرجعي: <strong style="color:var(--text-primary);">${latest.booking_reference}</strong>
+          </div>
+
+          <div style="background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border-right:4px solid var(--primary-gold); margin-bottom:20px;">
+            <p style="font-size:1rem; color:var(--text-gold); line-height:1.7;">${statusDesc}</p>
+          </div>
+
+          <div class="grid grid-cols-3" style="gap:14px; margin-bottom:20px; font-size:0.9rem; line-height:1.8;">
+            <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div>📅 <strong>الوصول (البداية):</strong></div>
+              <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.start_date)}</div>
+              <small class="text-muted">${p.arrival_time_desc || '12:00 ظهراً'}</small>
+            </div>
+            <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div>🚪 <strong>المغادرة (النهاية):</strong></div>
+              <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.departure_date)}</div>
+              <small class="text-muted">${p.departure_time_desc || 'قبل 9:00 صباحاً'}</small>
+            </div>
+            <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div>🌙 <strong>مدة الإقامة:</strong></div>
+              <div style="color:var(--primary-gold); font-weight:800; font-size:1rem;">${nightsCount} ليالي (${totalDays} أيام)</div>
+              <small class="text-muted">الخلوة الرسمية</small>
             </div>
           </div>
-        </div>
 
-        <div style="background:rgba(15,23,42,0.6); padding:16px; border-radius:10px; border-right:4px solid var(--primary-gold); margin-bottom:20px;">
-          <p style="font-size:1rem; color:var(--text-gold); line-height:1.7;">${statusDesc}</p>
-        </div>
-
-        <div class="grid grid-cols-3" style="gap:14px; margin-bottom:20px; font-size:0.9rem; line-height:1.8;">
-          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
-            <div>📅 <strong>الوصول (البداية):</strong></div>
-            <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.start_date)}</div>
-            <small class="text-muted">${p.arrival_time_desc || '12:00 ظهراً'}</small>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; border-top:1px solid var(--border-subtle); padding-top:16px;">
+            ${(latest.status === 'APPROVED' || latest.status === 'CHECKED_IN') ? `
+              <button class="btn btn-sm btn-outline-gold" onclick="openExtensionModal('${latest.id}')">
+                ⏳ طلب تمديد مدة الخلوة
+              </button>
+            ` : ''}
+            ${(latest.status === 'APPROVED' || latest.status === 'UNDER_REVIEW' || latest.status === 'WAITING_LIST') ? `
+              <button class="btn btn-sm btn-danger" onclick="cancelMyBooking('${latest.id}')">
+                ✕ اعتذار عن الحجز
+              </button>
+            ` : ''}
           </div>
-          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
-            <div>🚪 <strong>المغادرة (النهاية):</strong></div>
-            <div style="color:var(--text-primary); font-weight:700;">${formatArabicDate(p.departure_date)}</div>
-            <small class="text-muted">${p.departure_time_desc || 'قبل 9:00 صباحاً'}</small>
-          </div>
-          <div style="background:rgba(15,23,42,0.5); padding:14px; border-radius:10px; border:1px solid var(--border-subtle);">
-            <div>🌙 <strong>مدة الإقامة:</strong></div>
-            <div style="color:var(--primary-gold); font-weight:800; font-size:1rem;">${nightsCount} ليالي (${totalDays} أيام)</div>
-            <small class="text-muted">الخلوة الرسمية</small>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap; border-top:1px solid var(--border-subtle); padding-top:16px;">
-          ${(latest.status === 'APPROVED' || latest.status === 'CHECKED_IN') ? `
-            <button class="btn btn-sm btn-outline-gold" onclick="openExtensionModal('${latest.id}')">
-              ⏳ طلب تمديد مدة الخلوة
-            </button>
-          ` : ''}
-          ${(latest.status === 'APPROVED' || latest.status === 'UNDER_REVIEW' || latest.status === 'WAITING_LIST') ? `
-            <button class="btn btn-sm btn-danger" onclick="cancelMyBooking('${latest.id}')">
-              ✕ اعتذار عن الحجز
-            </button>
-          ` : ''}
-        </div>
-      `;
+        `;
+      }
 
       // Render History
-      historyList.innerHTML = bookings.map(b => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:rgba(15,23,42,0.4); border-radius:8px; margin-bottom:8px;">
-          <div>
-            <strong style="color:var(--text-primary); font-size:0.95rem;">${b.booking_reference}</strong>
-            <span class="text-muted" style="margin-right:8px; font-size:0.85rem;">- ${b.period ? b.period.period_name : ''}</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:0.8rem; color:var(--text-muted);">${b.created_at ? formatShortDate(b.created_at.slice(0,10)) : ''}</span>
-            <span class="badge badge-${b.status.toLowerCase()}">${b.status}</span>
-          </div>
-        </div>
-      `).join('');
+      if (historyList) {
+        historyList.innerHTML = bookings.map(b => {
+          const bStatusKey = (b.status || '').toLowerCase();
+          const bBadge = statusBadgeMap[bStatusKey] || `<span class="badge badge-secondary">${b.status || '-'}</span>`;
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:rgba(15,23,42,0.4); border-radius:8px; margin-bottom:8px;">
+              <div>
+                <strong style="color:var(--text-primary); font-size:0.95rem;">${b.booking_reference || '-'}</strong>
+                <span class="text-muted" style="margin-right:8px; font-size:0.85rem;">- ${b.period ? b.period.period_name : ''}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:0.8rem; color:var(--text-muted);">${b.created_at ? formatShortDate(String(b.created_at).slice(0,10)) : ''}</span>
+                ${bBadge}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
     }
   } catch (err) {
-    console.error(err);
+    console.error('Error loading my bookings:', err);
+    if (activeCard) {
+      activeCard.innerHTML = `<p style="color:#F43F5E; text-align:center; padding:20px;">تعذر تحميل بيانات الحجز: ${escapeHtml(err.message || 'حدث خطأ في الاتصال')}</p>`;
+    }
+    if (historyList) {
+      historyList.innerHTML = `<p class="text-muted">تعذر تحميل سجل الحجوزات.</p>`;
+    }
   }
 
-  // Load Profile Snapshot
+  // 2. Load Profile Snapshot
   try {
     const profile = await apiCall('/profile/me');
-    const profCard = document.getElementById('guest-profile-card');
     if (profCard && profile) {
       profCard.innerHTML = `
         <h3 style="color:var(--primary-gold); font-size:1.15rem; margin-bottom:14px;">👤 بيانات الملف الشخصي</h3>
         <div style="font-size:0.9rem; line-height:2;">
-          <div><strong>الاسم:</strong> ${profile.full_name}</div>
-          <div><strong>الهاتف:</strong> ${profile.phone_number}</div>
-          <div><strong>المحافظة:</strong> ${profile.governorate}</div>
-          <div><strong>الكنيسة:</strong> ${profile.church}</div>
-          <div><strong>عدد الخلوات السابقة:</strong> ${profile.total_retreats_count}</div>
-          <div><strong>آخر خلوة:</strong> ${profile.last_retreat_date || 'لا يوجد'}</div>
+          <div><strong>الاسم:</strong> ${profile.full_name || '-'}</div>
+          <div><strong>الهاتف:</strong> ${profile.phone_number || '-'}</div>
+          <div><strong>المحافظة:</strong> ${profile.governorate || '-'}</div>
+          <div><strong>الكنيسة:</strong> ${profile.church || '-'}</div>
+          <div><strong>عدد الخلوات السابقة:</strong> ${profile.total_retreats_count ?? 0}</div>
+          <div><strong>آخر خلوة:</strong> ${profile.last_retreat_date ? formatArabicDate(profile.last_retreat_date) : 'لا يوجد'}</div>
         </div>
       `;
     }
-  } catch(e) {}
+  } catch(err) {
+    console.error('Error loading profile:', err);
+    if (profCard) {
+      profCard.innerHTML = `<p style="color:#F43F5E; padding:10px;">تعذر تحميل الملف الشخصي: ${escapeHtml(err.message || '')}</p>`;
+    }
+  }
 
-  // Load Notifications
+  // 3. Load Notifications
   loadGuestNotifications();
 }
 
