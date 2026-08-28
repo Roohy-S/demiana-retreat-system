@@ -22,19 +22,22 @@ async def lifespan(app: FastAPI):
             db_path_str = settings.DATABASE_URL.split("///")[-1]
             if db_path_str and not db_path_str.startswith(":memory:"):
                 Path(db_path_str).parent.mkdir(parents=True, exist_ok=True)
-    except OSError:
+    except Exception:
         pass
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    # Initialize default settings if not exists
-    async with AsyncSessionLocal() as session:
-        stmt = select(SystemSettings).limit(1)
-        res = await session.execute(stmt)
-        if not res.scalar_one_or_none():
-            session.add(SystemSettings())
-            await session.commit()
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        # Initialize default settings if not exists
+        async with AsyncSessionLocal() as session:
+            stmt = select(SystemSettings).limit(1)
+            res = await session.execute(stmt)
+            if not res.scalar_one_or_none():
+                session.add(SystemSettings())
+                await session.commit()
+    except Exception as e:
+        print(f"[STARTUP WARNING] DB init note: {e}")
     yield
 
 app = FastAPI(

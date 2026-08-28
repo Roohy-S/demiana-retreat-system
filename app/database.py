@@ -32,14 +32,19 @@ else:
 
 engine = create_async_engine(db_url, **engine_kwargs)
 
+import os
 # Enable Foreign Keys and WAL mode for SQLite if running locally
 if is_sqlite:
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.close()
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            if not os.environ.get("VERCEL"):
+                cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
+        except Exception:
+            pass
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
