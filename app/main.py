@@ -15,12 +15,15 @@ import app.models # Ensure all models are loaded
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Ensure upload and data directories exist
-    upload_path = Path(settings.UPLOAD_DIR)
-    upload_path.mkdir(parents=True, exist_ok=True)
-    if "sqlite" in settings.DATABASE_URL:
-        db_path_str = settings.DATABASE_URL.split("///")[-1]
-        if db_path_str and not db_path_str.startswith(":memory:"):
-            Path(db_path_str).parent.mkdir(parents=True, exist_ok=True)
+    try:
+        upload_path = Path(settings.UPLOAD_DIR)
+        upload_path.mkdir(parents=True, exist_ok=True)
+        if "sqlite" in settings.DATABASE_URL:
+            db_path_str = settings.DATABASE_URL.split("///")[-1]
+            if db_path_str and not db_path_str.startswith(":memory:"):
+                Path(db_path_str).parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

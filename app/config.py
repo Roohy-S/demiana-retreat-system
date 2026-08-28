@@ -3,10 +3,11 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(BASE_DIR / ".env"),
+        env_file=str(BASE_DIR / ".env") if not IS_VERCEL else None,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=True
@@ -40,7 +41,8 @@ class Settings(BaseSettings):
     REQUIRE_EMAIL_VERIFICATION: bool = True
     
     # Storage
-    PRIVATE_STORAGE_DIR: Path = BASE_DIR / "app" / "storage"
+    PRIVATE_STORAGE_DIR: Path = Path("/tmp/storage") if IS_VERCEL else BASE_DIR / "app" / "storage"
+    UPLOAD_DIR: str = "/tmp/uploads" if IS_VERCEL else "./uploads"
     MAX_UPLOAD_SIZE_BYTES: int = 5 * 1024 * 1024  # 5MB
     ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png", "pdf"}
     
@@ -54,7 +56,8 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         url = self.DATABASE_URL.strip() if self.DATABASE_URL else ""
         if not url:
-            return f"sqlite+aiosqlite:///{BASE_DIR / 'demiana_retreat.db'}"
+            db_path = "/tmp/demiana_retreat.db" if IS_VERCEL else str(BASE_DIR / "demiana_retreat.db")
+            return f"sqlite+aiosqlite:///{db_path}"
         
         # Convert postgres:// or postgresql:// to postgresql+asyncpg://
         if url.startswith("postgres://"):
@@ -71,4 +74,7 @@ class Settings(BaseSettings):
         return url
 
 settings = Settings()
-settings.PRIVATE_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    settings.PRIVATE_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
