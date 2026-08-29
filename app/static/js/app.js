@@ -37,40 +37,55 @@ async function apiCall(endpoint, options = {}) {
     fetchOptions.body = options.isFormData ? options.body : JSON.stringify(options.body);
   }
 
-  try {
-    const response = await fetch(`/api/v1${endpoint}`, fetchOptions);
-    
-    // Check if error response
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const msg = errData.detail || 'حدث خطأ في معالجة الطلب';
-      
-      // Check if email verification is required
-      if (response.status === 403 && msg.includes('EMAIL_NOT_VERIFIED')) {
-        const ident = options.body ? (options.body.email || options.body.identifier || '') : '';
-        openEmailVerificationModal(ident);
-        throw new Error('يرجى تأكيد حسابكِ برمز التحقق (OTP) المرسل إلى بريدك الإلكتروني');
+  const urlPrefixes = ['/api/v1', '/api', '/v1', ''];
+  let lastError = null;
+
+  for (const prefix of urlPrefixes) {
+    try {
+      const url = `${prefix}${endpoint}`;
+      const response = await fetch(url, fetchOptions);
+
+      if (response.status === 405 || response.status === 404) {
+        continue;
       }
 
-      if (response.status === 401 && AppState.token) {
-        logout();
-        showToast('انتهت الجلسة، يرجى تسجيل الدخول مجدداً', 'warning');
+      // Check if error response
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData.detail || 'حدث خطأ في معالجة الطلب';
+
+        // Check if email verification is required
+        if (response.status === 403 && msg.includes('EMAIL_NOT_VERIFIED')) {
+          const ident = options.body ? (options.body.email || options.body.identifier || '') : '';
+          openEmailVerificationModal(ident);
+          throw new Error('يرجى تأكيد حسابكِ برمز التحقق (OTP) المرسل إلى بريدك الإلكتروني');
+        }
+
+        if (response.status === 401 && AppState.token) {
+          logout();
+          showToast('انتهت الجلسة، يرجى تسجيل الدخول مجدداً', 'warning');
+        }
+
+        throw new Error(msg);
       }
 
-      throw new Error(msg);
+      // If PDF or blob
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/pdf')) {
+        return await response.blob();
+      }
+
+      return await response.json();
+    } catch (err) {
+      lastError = err;
+      if (err.message && !err.message.includes('405') && !err.message.includes('Not Found') && !err.message.includes('Failed to fetch')) {
+        throw err;
+      }
     }
-    
-    // If PDF or blob
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/pdf')) {
-      return await response.blob();
-    }
-    
-    return await response.json();
-  } catch (err) {
-    console.error('API Error:', err);
-    throw err;
   }
+
+  if (lastError) throw lastError;
+  throw new Error('حدث خطأ في معالجة الطلب');
 }
 
 // Toast Notifications

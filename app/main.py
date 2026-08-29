@@ -130,8 +130,25 @@ def get_cached_css() -> str:
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/v1")
 app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
 
-from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
+@app.post("/api/index.py")
+@app.post("/index.py")
+@app.post("/api")
+@app.post("/")
+async def handle_direct_api_login(request: Request):
+    try:
+        body = await request.json()
+        if "identifier" in body or ("email" in body and "password" in body):
+            from app.api.auth import login
+            from app.schemas.auth import UserLogin
+            from app.database import get_db
+            payload = UserLogin(**body)
+            async for db in get_db():
+                return await login(payload, request, db)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 def get_html_page_content(inline_css: str) -> str:
     return f"""<!DOCTYPE html>
@@ -200,9 +217,6 @@ def get_html_page_content(inline_css: str) -> str:
 @app.get("/api/index.py", response_class=HTMLResponse)
 @app.get("/api/index", response_class=HTMLResponse)
 @app.get("/api", response_class=HTMLResponse)
-@app.get("/{full_path:path}", response_class=HTMLResponse)
-async def get_index_page(request: Request, full_path: str = ""):
-    if full_path and (full_path.startswith("api/v1/") or full_path.startswith("v1/")):
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+async def get_index_page(request: Request):
     inline_css = get_cached_css()
     return HTMLResponse(content=get_html_page_content(inline_css))
