@@ -121,8 +121,21 @@ async def serve_static_file(file_path: str):
             return FileResponse(str(candidate), media_type=media_type)
     return Response(status_code=404, content="Static file not found")
 
-# Include API Endpoints
-app.include_router(api_router, prefix=settings.API_V1_STR)
+def get_cached_css() -> str:
+    candidates = [
+        STATIC_DIR / "css" / "style.css",
+        Path(__file__).resolve().parent / "static" / "css" / "style.css",
+        Path(__file__).resolve().parent.parent / "static" / "css" / "style.css",
+        Path(__file__).resolve().parent.parent / "public" / "static" / "css" / "style.css",
+        Path(__file__).resolve().parent.parent / "public" / "css" / "style.css"
+    ]
+    for c in candidates:
+        if c.exists() and c.is_file():
+            try:
+                return c.read_text(encoding="utf-8")
+            except Exception:
+                pass
+    return ""
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.py", response_class=HTMLResponse)
@@ -130,7 +143,8 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/index.html", response_class=HTMLResponse)
 @app.get("/index", response_class=HTMLResponse)
 async def get_index_page(request: Request):
-    html_content = """<!DOCTYPE html>
+    inline_css = get_cached_css()
+    html_content = f"""<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -142,6 +156,10 @@ async def get_index_page(request: Request):
   <title>بيت الخلوة – دير القديسة دميانة – ببراري بلقاس</title>
   <meta name="description" content="النظام الإلكتروني الرسمي لحجز وإدارة بيت الخلوة بدير القديسة دميانة ببراري بلقاس">
   <link rel="stylesheet" href="/static/css/style.css?v=2.8">
+  <link rel="stylesheet" href="/css/style.css?v=2.8">
+  <style>
+    {inline_css}
+  </style>
   <link rel="icon" href="/static/images/cross.png" type="image/png">
   <link rel="apple-touch-icon" href="/static/images/cross.png">
 </head>
