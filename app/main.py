@@ -77,12 +77,29 @@ app.add_middleware(
 # Vercel Serverless Path Normalizer Middleware
 @app.middleware("http")
 async def fix_vercel_path_middleware(request: Request, call_next):
-    raw_path = request.url.path
-    orig_path = request.headers.get("x-matched-path") or request.headers.get("x-invoke-path") or request.headers.get("x-forwarded-uri")
-    if orig_path and orig_path not in ("/api/index.py", "/index.py", "/api/index"):
-        request.scope["path"] = orig_path.split("?")[0]
-    elif raw_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
-        request.scope["path"] = "/"
+    path_param = request.query_params.get("__path")
+    if path_param:
+        clean_p = path_param.strip("/")
+        if not clean_p or clean_p == "/":
+            request.scope["path"] = "/"
+        elif clean_p.startswith("api/"):
+            request.scope["path"] = "/" + clean_p
+        elif clean_p.startswith("v1/"):
+            request.scope["path"] = "/api/" + clean_p
+        else:
+            request.scope["path"] = "/" + clean_p
+    else:
+        raw_path = request.url.path
+        orig_path = (
+            request.headers.get("x-matched-path")
+            or request.headers.get("x-vercel-matched-path")
+            or request.headers.get("x-invoke-path")
+            or request.headers.get("x-forwarded-uri")
+        )
+        if orig_path and orig_path not in ("/api/index.py", "/index.py", "/api/index"):
+            request.scope["path"] = orig_path.split("?")[0]
+        elif raw_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
+            request.scope["path"] = "/"
     return await call_next(request)
 
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -136,6 +153,11 @@ def get_cached_css() -> str:
             except Exception:
                 pass
     return ""
+
+# Include API Endpoints on all standard prefixes
+app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/v1")
+app.include_router(api_router, prefix="/api")
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.py", response_class=HTMLResponse)

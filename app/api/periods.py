@@ -15,6 +15,7 @@ from app.core.audit import record_audit_log
 router = APIRouter(prefix="/periods", tags=["Retreat Periods"])
 
 @router.get("", response_model=List[PeriodOut])
+@router.get("/", response_model=List[PeriodOut])
 async def list_open_periods(db: AsyncSession = Depends(get_db)):
     """
     Public/Applicant endpoint to view open retreat periods.

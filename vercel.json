@@ -3,15 +3,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=api/$1"
     },
     {
       "source": "/",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=/"
     },
     {
       "source": "/((?!static|images|css|js|favicon.ico).*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=$1"
     }
   ]
 }
