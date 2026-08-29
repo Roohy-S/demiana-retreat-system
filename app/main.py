@@ -78,14 +78,12 @@ app.add_middleware(
 @app.middleware("http")
 async def fix_vercel_path_middleware(request: Request, call_next):
     raw_path = request.url.path
-    if raw_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
-        orig_path = request.headers.get("x-matched-path") or request.headers.get("x-invoke-path") or "/"
-        if orig_path and orig_path not in ("/api/index.py", "/index.py", "/api/index", "/api"):
-            request.scope["path"] = orig_path
-        else:
-            request.scope["path"] = "/"
-    response = await call_next(request)
-    return response
+    orig_path = request.headers.get("x-matched-path") or request.headers.get("x-invoke-path") or request.headers.get("x-forwarded-uri")
+    if orig_path and orig_path not in ("/api/index.py", "/index.py", "/api/index"):
+        request.scope["path"] = orig_path.split("?")[0]
+    elif raw_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
+        request.scope["path"] = "/"
+    return await call_next(request)
 
 from fastapi.responses import HTMLResponse, FileResponse, Response
 
