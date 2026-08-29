@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env") if not IS_VERCEL else None,
         env_file_encoding="utf-8",
-        extra="ignore",
+        extra="allow",
         case_sensitive=False
     )
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "demiana_monastery_retreat_super_secret_jwt_key_2026_prod"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: Union[int, str] = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: Any = 60 * 24 * 7  # 7 days
     
     # Database (Supabase PostgreSQL or local SQLite)
     DATABASE_URL: str = ""
@@ -33,25 +33,25 @@ class Settings(BaseSettings):
     
     # Gmail / SMTP Settings
     SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: Union[int, str] = 587
+    SMTP_PORT: Any = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "بيت الخلوة – دير القديسة دميانة ببراري بلقاس"
-    SMTP_USE_TLS: Union[bool, str, int] = True
-    EMAIL_VERIFICATION_EXPIRY_MINUTES: Union[int, str] = 15
-    REQUIRE_EMAIL_VERIFICATION: Union[bool, str, int] = True
+    SMTP_USE_TLS: Any = True
+    EMAIL_VERIFICATION_EXPIRY_MINUTES: Any = 15
+    REQUIRE_EMAIL_VERIFICATION: Any = True
     
     # Storage
     PRIVATE_STORAGE_DIR: Path = Path("/tmp/storage") if IS_VERCEL else BASE_DIR / "app" / "storage"
     UPLOAD_DIR: str = "/tmp/uploads" if IS_VERCEL else "./uploads"
-    MAX_UPLOAD_SIZE_BYTES: Union[int, str] = 5 * 1024 * 1024  # 5MB
+    MAX_UPLOAD_SIZE_BYTES: Any = 5 * 1024 * 1024  # 5MB
     ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png", "pdf"}
     
     # Business Rules Defaults
-    DEFAULT_RETREAT_NIGHTS: Union[int, str] = 3
-    MIN_BOOKING_INTERVAL_MONTHS: Union[int, str] = 3
-    MIN_APPLICANT_AGE_YEARS: Union[int, str] = 15
-    DEFAULT_PERIOD_CAPACITY: Union[int, str] = 20
+    DEFAULT_RETREAT_NIGHTS: Any = 3
+    MIN_BOOKING_INTERVAL_MONTHS: Any = 3
+    MIN_APPLICANT_AGE_YEARS: Any = 15
+    DEFAULT_PERIOD_CAPACITY: Any = 20
 
     @property
     def async_database_url(self) -> str:
