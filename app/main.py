@@ -197,9 +197,12 @@ def get_html_page_content(inline_css: str) -> str:
 @app.get("/index.html", response_class=HTMLResponse)
 @app.get("/index.py", response_class=HTMLResponse)
 @app.get("/index", response_class=HTMLResponse)
+@app.get("/api/index.py", response_class=HTMLResponse)
+@app.get("/api/index", response_class=HTMLResponse)
+@app.get("/api", response_class=HTMLResponse)
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def get_index_page(request: Request, full_path: str = ""):
-    if full_path and (full_path.startswith("api/") or full_path.startswith("v1/")):
+    if full_path and (full_path.startswith("api/v1/") or full_path.startswith("v1/")):
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
     inline_css = get_cached_css()
     return HTMLResponse(content=get_html_page_content(inline_css))
