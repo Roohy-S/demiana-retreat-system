@@ -151,10 +151,6 @@ async def handle_api_fallback_post(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
-@app.get("/index.py", response_class=HTMLResponse)
-@app.get("/api/index.py", response_class=HTMLResponse)
-@app.get("/api/index", response_class=HTMLResponse)
-@app.get("/api", response_class=HTMLResponse)
 async def get_index_page(request: Request):
     inline_css = get_cached_css()
     html_content = f"""<!DOCTYPE html>
