@@ -194,7 +194,23 @@ async function renderLandingView(container) {
           </div>
         </div>
       </div>
-    </div>
+    <!-- Footer Section -->
+    <footer style="margin-top:70px; padding:35px 20px 50px; text-align:center; border-top:1px solid var(--border-subtle); background:rgba(11,15,23,0.85);">
+      <div class="container" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+        <img src="/static/images/cross.png" style="height:36px; opacity:0.85;" />
+        <div style="color:var(--text-gold); font-size:0.95rem; font-weight:600;">
+          بيت الخلوة بدير القديسة دميانة – ببراري بلقاس – محافظة الدقهلية
+        </div>
+        <div class="text-muted" style="font-size:0.82rem;">
+          جميع الحقوق محفوظة لدير الشهيدة دميانة بالبراري © 2026
+        </div>
+        <div style="margin-top:8px;">
+          <a href="javascript:void(0)" onclick="navigate('login')" class="auth-link" style="font-size:0.8rem; color:var(--text-muted); opacity:0.75; text-decoration:none;">
+            🔒 بوابة الإدارة الرهبانية
+          </a>
+        </div>
+      </div>
+    </footer>
   `;
 
   loadLandingPeriods();
@@ -210,15 +226,13 @@ async function loadLandingPeriods() {
     const periods = await apiCall('/periods');
     if (!periods || periods.length === 0) {
       container.innerHTML = `
-        <div style="grid-column: 1/-1; text-align:center; padding:40px 20px;" class="glass-card">
+        <div style="grid-column: 1/-1; text-align:center; padding:45px 20px;" class="glass-card">
           <div style="font-size:2.2rem; margin-bottom:14px;">🕊️</div>
-          <h3 style="color:var(--primary-gold); margin-bottom:10px; font-size:1.25rem;">بيت الخلوة بدير القديسة دميانة</h3>
-          <p style="color:var(--text-secondary); max-width:600px; margin:0 auto 20px; line-height:1.9;">
-            لا توجد فترات خلوة مفتوحة للحجز حالياً. يتم فتح وتحديد مواعيد الفترات دورياً من قِبل إدارة الدير والأم المسؤولة.
+          <h3 style="color:var(--primary-gold); margin-bottom:12px; font-size:1.25rem;">فترات الخلوة بدير القديسة دميانة</h3>
+          <p style="color:var(--text-secondary); max-width:620px; margin:0 auto; line-height:2; font-size:1rem;">
+            لا توجد فترات خلوة مفتوحة للحجز حالياً.<br>
+            يتم فتح وتحديد مواعيد فترات الخلوة الجديدة دورياً من قِبل إدارة الدير.
           </p>
-          <button class="btn btn-outline-gold" onclick="navigate('login')" style="font-size:0.95rem;">
-            🔑 تسجيل دخول الأم المسؤولة لإضافة وإدارة الفترات
-          </button>
         </div>
       `;
       return;
@@ -257,15 +271,13 @@ async function loadLandingPeriods() {
 
   } catch (err) {
     container.innerHTML = `
-      <div style="grid-column: 1/-1; text-align:center; padding:40px 20px;" class="glass-card">
+      <div style="grid-column: 1/-1; text-align:center; padding:45px 20px;" class="glass-card">
         <div style="font-size:2.2rem; margin-bottom:14px;">🕊️</div>
-        <h3 style="color:var(--primary-gold); margin-bottom:10px; font-size:1.25rem;">بيت الخلوة بدير القديسة دميانة</h3>
-        <p style="color:var(--text-secondary); max-width:600px; margin:0 auto 20px; line-height:1.9;">
-          لا توجد فترات خلوة مفتوحة للحجز حالياً. يتم فتح وتحديد مواعيد الفترات دورياً من قِبل إدارة الدير والأم المسؤولة.
+        <h3 style="color:var(--primary-gold); margin-bottom:12px; font-size:1.25rem;">فترات الخلوة بدير القديسة دميانة</h3>
+        <p style="color:var(--text-secondary); max-width:620px; margin:0 auto; line-height:2; font-size:1rem;">
+          لا توجد فترات خلوة مفتوحة للحجز حالياً.<br>
+          يتم فتح وتحديد مواعيد فترات الخلوة الجديدة دورياً من قِبل إدارة الدير.
         </p>
-        <button class="btn btn-outline-gold" onclick="navigate('login')" style="font-size:0.95rem;">
-          🔑 تسجيل دخول الأم المسؤولة لإضافة وإدارة الفترات
-        </button>
       </div>
     `;
   }

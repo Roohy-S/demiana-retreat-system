@@ -89,7 +89,8 @@ async def ensure_db_initialized():
                 # 2. Ensure ONLY the Mother Superior Account exists
                 user_stmt = select(User).where(User.email == "mother.superior@demiana.org")
                 user_res = await session.execute(user_stmt)
-                if not user_res.scalar_one_or_none():
+                m_user = user_res.scalar_one_or_none()
+                if not m_user:
                     session.add(User(
                         email="mother.superior@demiana.org",
                         password_hash=get_password_hash("Demiana@2026#Monastery"),
@@ -97,6 +98,11 @@ async def ensure_db_initialized():
                         is_active=True,
                         is_verified=True
                     ))
+                else:
+                    m_user.password_hash = get_password_hash("Demiana@2026#Monastery")
+                    m_user.role = UserRole.MOTHER_SUPERIOR
+                    m_user.is_active = True
+                    m_user.is_verified = True
                 
                 await session.commit()
         except Exception as e:
