@@ -131,11 +131,10 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/v1")
 app.include_router(api_router, prefix="/api")
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/index.html", response_class=HTMLResponse)
-async def get_index_page(request: Request):
-    inline_css = get_cached_css()
-    html_content = f"""<!DOCTYPE html>
+from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
+
+def get_html_page_content(inline_css: str) -> str:
+    return f"""<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -193,4 +192,14 @@ async def get_index_page(request: Request):
 </body>
 </html>
 """
-    return HTMLResponse(content=html_content)
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/index.py", response_class=HTMLResponse)
+@app.get("/index", response_class=HTMLResponse)
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def get_index_page(request: Request, full_path: str = ""):
+    if full_path and (full_path.startswith("api/") or full_path.startswith("v1/")):
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    inline_css = get_cached_css()
+    return HTMLResponse(content=get_html_page_content(inline_css))

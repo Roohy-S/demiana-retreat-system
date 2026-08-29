@@ -11,6 +11,7 @@ from app.main import app as fastapi_app
 
 async def app(scope, receive, send):
     if scope["type"] == "http":
+        scope["root_path"] = ""
         query_string = scope.get("query_string", b"").decode("utf-8")
         params = parse_qs(query_string)
         path_param = params.get("__path", [None])[0]
@@ -29,10 +30,10 @@ async def app(scope, receive, send):
         else:
             headers = dict(scope.get("headers", []))
             raw_matched = (
-                headers.get(b"x-matched-path")
-                or headers.get(b"x-vercel-matched-path")
+                headers.get(b"x-invoke-path")
                 or headers.get(b"x-forwarded-uri")
-                or headers.get(b"x-invoke-path")
+                or headers.get(b"x-vercel-matched-path")
+                or headers.get(b"x-matched-path")
             )
             if raw_matched:
                 p = unquote(raw_matched.decode("utf-8")).split("?")[0]
