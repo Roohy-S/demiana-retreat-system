@@ -64,21 +64,29 @@ async def ensure_db_initialized():
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             
-            # Lazy import models and security helper
             from app.models.settings import SystemSettings
             from app.models.user import User, UserRole
-            from app.models.period import RetreatPeriod, PeriodStatus
             from app.core.security import get_password_hash
-            from datetime import date, timedelta
+            from sqlalchemy import select
 
             async with AsyncSessionLocal() as session:
-                # 1. Seed System Settings
+                # 1. Ensure System Settings exist
                 stmt = select(SystemSettings).limit(1)
                 res = await session.execute(stmt)
                 if not res.scalar_one_or_none():
-                    session.add(SystemSettings())
+                    session.add(SystemSettings(
+                        retreat_name="بيت الخلوة بدير القديسة دميانة",
+                        monastery_location="ببراري بلقاس",
+                        default_retreat_nights=3,
+                        min_booking_interval_months=3,
+                        min_applicant_age_years=15,
+                        default_period_capacity=20,
+                        allow_waitlist=True,
+                        allow_extensions=True,
+                        allow_exceptions=True
+                    ))
 
-                # 2. Seed Default Administrative Users
+                # 2. Ensure ONLY the Mother Superior Account exists
                 user_stmt = select(User).where(User.email == "mother.superior@demiana.org")
                 user_res = await session.execute(user_stmt)
                 if not user_res.scalar_one_or_none():
@@ -89,58 +97,10 @@ async def ensure_db_initialized():
                         is_active=True,
                         is_verified=True
                     ))
-                    session.add(User(
-                        email="mother@stdemiana.org",
-                        password_hash=get_password_hash("MotherAdmin@123"),
-                        role=UserRole.MOTHER_SUPERIOR,
-                        is_active=True,
-                        is_verified=True
-                    ))
-                    session.add(User(
-                        email="sister.supervisor@demiana.org",
-                        password_hash=get_password_hash("Demiana@2026#Monastery"),
-                        role=UserRole.BOOKING_SUPERVISOR,
-                        is_active=True,
-                        is_verified=True
-                    ))
-                    session.add(User(
-                        email="reception@demiana.org",
-                        password_hash=get_password_hash("Demiana@2026#Monastery"),
-                        role=UserRole.RECEPTION_SUPERVISOR,
-                        is_active=True,
-                        is_verified=True
-                    ))
-
-                # 3. Seed Upcoming Retreat Periods
-                p_stmt = select(RetreatPeriod).limit(1)
-                p_res = await session.execute(p_stmt)
-                if not p_res.scalar_one_or_none():
-                    today = date.today()
-                    days_ar = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
-
-                    def make_title(s_date, e_date, nights):
-                        s_day = days_ar[s_date.weekday()]
-                        e_day = days_ar[e_date.weekday()]
-                        return f"فترة خلوة: من {s_day} {s_date.strftime('%d-%m-%Y')} إلى {e_day} {e_date.strftime('%d-%m-%Y')} ({nights} ليالي)"
-
-                    for d_offset in [3, 10, 17, 24]:
-                        s_d = today + timedelta(days=d_offset)
-                        e_d = s_d + timedelta(days=3)
-                        session.add(RetreatPeriod(
-                            period_name=make_title(s_d, e_d, 3),
-                            start_date=s_d,
-                            end_date=e_d,
-                            departure_date=e_d,
-                            arrival_time_desc="الساعة 12:00 ظهراً",
-                            departure_time_desc="قبل الساعة 9:00 صباحاً",
-                            nights_count=3,
-                            capacity=20,
-                            status=PeriodStatus.OPEN
-                        ))
                 
                 await session.commit()
         except Exception as e:
-            print(f"[DB AUTO-INIT NOTE] {e}")
+            print(f"[DB CLEAN INIT NOTE] {e}")
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     await ensure_db_initialized()

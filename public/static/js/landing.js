@@ -210,8 +210,15 @@ async function loadLandingPeriods() {
     const periods = await apiCall('/periods');
     if (!periods || periods.length === 0) {
       container.innerHTML = `
-        <div style="grid-column: 1/-1; text-align:center; padding:30px;" class="glass-card">
-          <p class="text-gold">لا توجد فترات مفتوحة للحجز حالياً. يتم فتح الفترات دورياً من إدارة الدير.</p>
+        <div style="grid-column: 1/-1; text-align:center; padding:40px 20px;" class="glass-card">
+          <div style="font-size:2.2rem; margin-bottom:14px;">🕊️</div>
+          <h3 style="color:var(--primary-gold); margin-bottom:10px; font-size:1.25rem;">بيت الخلوة بدير القديسة دميانة</h3>
+          <p style="color:var(--text-secondary); max-width:600px; margin:0 auto 20px; line-height:1.9;">
+            لا توجد فترات خلوة مفتوحة للحجز حالياً. يتم فتح وتحديد مواعيد الفترات دورياً من قِبل إدارة الدير والأم المسؤولة.
+          </p>
+          <button class="btn btn-outline-gold" onclick="navigate('login')" style="font-size:0.95rem;">
+            🔑 تسجيل دخول الأم المسؤولة لإضافة وإدارة الفترات
+          </button>
         </div>
       `;
       return;
@@ -249,7 +256,18 @@ async function loadLandingPeriods() {
     }).join('');
 
   } catch (err) {
-    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#F43F5E;">تعذر تحميل فترات الخلوة.</div>`;
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align:center; padding:40px 20px;" class="glass-card">
+        <div style="font-size:2.2rem; margin-bottom:14px;">🕊️</div>
+        <h3 style="color:var(--primary-gold); margin-bottom:10px; font-size:1.25rem;">بيت الخلوة بدير القديسة دميانة</h3>
+        <p style="color:var(--text-secondary); max-width:600px; margin:0 auto 20px; line-height:1.9;">
+          لا توجد فترات خلوة مفتوحة للحجز حالياً. يتم فتح وتحديد مواعيد الفترات دورياً من قِبل إدارة الدير والأم المسؤولة.
+        </p>
+        <button class="btn btn-outline-gold" onclick="navigate('login')" style="font-size:0.95rem;">
+          🔑 تسجيل دخول الأم المسؤولة لإضافة وإدارة الفترات
+        </button>
+      </div>
+    `;
   }
 }
 
