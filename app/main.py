@@ -1,5 +1,13 @@
-from contextlib import asynccontextmanager
+import os
+import sys
 from pathlib import Path
+
+# Ensure root directory is always in sys.path
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
