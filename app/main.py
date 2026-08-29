@@ -131,24 +131,6 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/v1")
 app.include_router(api_router, prefix="/api")
 
-@app.post("/api/index.py")
-@app.post("/api/index")
-@app.post("/api")
-@app.post("/index.py")
-async def handle_api_fallback_post(request: Request):
-    try:
-        data = await request.json()
-        if "identifier" in data or ("email" in data and "password" in data):
-            from app.api.auth import login
-            from app.schemas.auth import UserLogin
-            from app.database import get_db
-            payload = UserLogin(**data)
-            async for db in get_db():
-                return await login(payload, request, db)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    raise HTTPException(status_code=404, detail="Endpoint not found")
-
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
 async def get_index_page(request: Request):
