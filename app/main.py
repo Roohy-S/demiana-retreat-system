@@ -74,6 +74,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Vercel Serverless Path Normalizer Middleware
+@app.middleware("http")
+async def fix_vercel_path_middleware(request: Request, call_next):
+    raw_path = request.url.path
+    if raw_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
+        orig_path = request.headers.get("x-matched-path") or request.headers.get("x-invoke-path") or "/"
+        if orig_path and orig_path not in ("/api/index.py", "/index.py", "/api/index", "/api"):
+            request.scope["path"] = orig_path
+        else:
+            request.scope["path"] = "/"
+    response = await call_next(request)
+    return response
+
 # Static Files
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if not STATIC_DIR.exists():
@@ -86,6 +99,10 @@ if STATIC_DIR.exists():
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/index.py", response_class=HTMLResponse)
+@app.get("/api/index.py", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/index", response_class=HTMLResponse)
 async def get_index_page(request: Request):
     html_content = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
