@@ -59,7 +59,11 @@ app.add_middleware(
 
 # Static Files
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+if not STATIC_DIR.exists():
+    STATIC_DIR = Path(__file__).resolve().parent.parent / "app" / "static"
+
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Include API Endpoints
 app.include_router(api_router, prefix=settings.API_V1_STR)
