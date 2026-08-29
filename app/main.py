@@ -87,13 +87,41 @@ async def fix_vercel_path_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
-# Static Files
+from fastapi.responses import HTMLResponse, FileResponse, Response
+
+# Static Files Candidate Search
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if not STATIC_DIR.exists():
     STATIC_DIR = Path(__file__).resolve().parent.parent / "app" / "static"
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/static/{file_path:path}")
+async def serve_static_file(file_path: str):
+    candidates = [
+        STATIC_DIR / file_path,
+        Path(__file__).resolve().parent / "static" / file_path,
+        Path(__file__).resolve().parent.parent / "app" / "static" / file_path,
+        Path(__file__).resolve().parent.parent / "static" / file_path
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            media_type = None
+            if file_path.endswith(".css"):
+                media_type = "text/css"
+            elif file_path.endswith(".js"):
+                media_type = "application/javascript"
+            elif file_path.endswith(".png"):
+                media_type = "image/png"
+            elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+                media_type = "image/jpeg"
+            elif file_path.endswith(".svg"):
+                media_type = "image/svg+xml"
+            elif file_path.endswith(".ico"):
+                media_type = "image/x-icon"
+            return FileResponse(str(candidate), media_type=media_type)
+    return Response(status_code=404, content="Static file not found")
 
 # Include API Endpoints
 app.include_router(api_router, prefix=settings.API_V1_STR)
