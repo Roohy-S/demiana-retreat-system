@@ -1,24 +1,33 @@
 import os
 import sys
+import traceback
 from pathlib import Path
 
-# Ensure root directory is always in sys.path
-_ROOT_DIR = Path(__file__).resolve().parent.parent
-if str(_ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(_ROOT_DIR))
+# Ensure root directory and app directory are always in sys.path
+_FILE_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = _FILE_DIR.parent
 
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+for _p in [str(_ROOT_DIR), str(_FILE_DIR), os.getcwd()]:
+    if _p and _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from app.config import settings
-from app.database import engine, Base, AsyncSessionLocal
-from app.api import api_router
-from app.models.settings import SystemSettings
-import app.models # Ensure all models are loaded
+try:
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI, Request
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import HTMLResponse
+    from fastapi.middleware.cors import CORSMiddleware
+    from sqlalchemy import select
+
+    from app.config import settings
+    from app.database import engine, Base, AsyncSessionLocal
+    from app.api import api_router
+    from app.models.settings import SystemSettings
+    import app.models # Ensure all models are loaded
+except Exception as _e:
+    print(f"[FATAL ERROR IMPORTING APP/MAIN.PY] {_e}", file=sys.stderr)
+    traceback.print_exc()
+    raise _e
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
