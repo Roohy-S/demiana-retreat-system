@@ -19,16 +19,17 @@ class VercelEntrypointMiddleware:
             params = parse_qs(query_string)
             path_param = params.get("__path", [None])[0]
             
+            final_path = "/"
             if path_param:
                 clean_p = path_param.strip("/")
                 if not clean_p or clean_p == "/":
-                    scope["path"] = "/"
+                    final_path = "/"
                 elif clean_p.startswith("api/"):
-                    scope["path"] = "/" + clean_p
+                    final_path = "/" + clean_p
                 elif clean_p.startswith("v1/"):
-                    scope["path"] = "/api/" + clean_p
+                    final_path = "/api/" + clean_p
                 else:
-                    scope["path"] = "/" + clean_p
+                    final_path = "/" + clean_p
             else:
                 headers = dict(scope.get("headers", []))
                 raw_orig = (
@@ -40,9 +41,18 @@ class VercelEntrypointMiddleware:
                 if raw_orig:
                     orig_path = raw_orig.decode("utf-8").split("?")[0]
                     if orig_path not in ("/api/index.py", "/index.py", "/api/index", "/api"):
-                        scope["path"] = orig_path
-                elif scope.get("path") in ("/api/index.py", "/index.py", "/api/index", "/api"):
-                    scope["path"] = "/"
+                        final_path = orig_path
+                    else:
+                        final_path = "/"
+                else:
+                    cur_path = scope.get("path", "/")
+                    if cur_path in ("/api/index.py", "/index.py", "/api/index", "/api"):
+                        final_path = "/"
+                    else:
+                        final_path = cur_path
+
+            scope["path"] = final_path
+            scope["raw_path"] = final_path.encode("utf-8")
 
         await self.app(scope, receive, send)
 
